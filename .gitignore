@@ -126,4 +126,10 @@ venv.bak/
 dmypy.json
 
 # Pyre type checker
-.pyre/
+.pyre
+
+# folders already backedup elsewhere
+iCLIP/
+
+#analysis folders
+analysis/**
