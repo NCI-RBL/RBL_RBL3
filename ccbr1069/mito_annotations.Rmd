@@ -1,0 +1,177 @@
+---
+title: "mito_annotations"
+author: "Sevilla"
+date: "10/8/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Background
+When reviewing the MitoCarta2.0 gene list, it was determined that 98 genes were not found in hg19. Further investigation revealed that these genes had been updated, or were listed by alternative alias's. The mito gene list needed to be updated, accordingly
+
+# Analysis
+### Load packages
+```{r message=FALSE,warning=FALSE}
+library(ape) #read in gff obj
+library(stringr) #split strings
+library(GenomicRanges) # determine gene list
+library(rtracklayer)
+```
+
+
+Download encode's gtf from website and subset to protein coding genes
+```{r}
+#download lastest gencode release
+#ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gff3.gz
+
+#read in gff
+gtf = rtracklayer::import("ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz")
+print(paste("Total number of genes:",dim(as.data.frame(gtf))[1]))
+
+#subset to genes
+gtf_genes=gtf[(GenomicRanges::elementMetadata(gtf)$type=="gene"),]
+remove(gtf)
+print(paste("Total number of genes:",dim(as.data.frame(gtf_genes))[1]))
+
+
+#subset to protein coding
+gtf_genes_protein_coding=gtf_genes[(GenomicRanges::elementMetadata(gtf_genes)$gene_type=="protein_coding"),]
+remove(gtf_genes)
+print(paste("Total number of genes:",dim(as.data.frame(gtf_genes_protein_coding))[1]))
+
+```
+
+Read in MitoCarta 2.0 gene list
+```{r}
+mito.df = read.csv("ref/human.mitocarta2.0_v1.txt",sep='\t')
+mito.df.sub = mito.df[,c("hg19_Chromosome","hg19_Start","hg19_Stop","Symbol", "EnsemblGeneID","MCARTA2.0_score")]
+head(mito.df.sub)
+```
+
+Since we'll use EnsemblID's, check for duplicates or samples without ID's
+```{r}
+#check for duplicates or blanks 
+CheckDups <- function(df_in){
+  n_occur <- data.frame(table(df_in$EnsemblGeneID))
+  n_occur[n_occur$Freq > 1,]
+  print(df_in[df_in$EnsemblGeneID %in% n_occur$Var1[n_occur$Freq > 1],])
+}
+
+CheckDups(mito.df.sub)
+```
+
+There are six potential errors to review
+```{r}
+#Fix errors with these ID's
+#     hg19_Chromosome hg19_Start hg19_Stop       Symbol   EnsemblGeneID MCARTA2.0_score
+#348             chrX   40482817  40483391        MPC1L                         20.0388
+#666             chr7   99014361  99036462        PTCD1 ENSG00000106246         11.8591
+#713            chr15   43985083  43991420       CKMT1A ENSG00000223572         10.6859
+#905             chr6   99968869  99981059        TSTD3                          6.0678
+#1107           chr15   43885251  43891604       CKMT1B ENSG00000223572         -3.7420
+#1109            chr7   99014361  99063824 ATP5J2-PTCD1 ENSG00000106246         -3.7840
+
+UpdateEnsemblID <- function(df_in,select_row,new_id){
+  levels(df_in$EnsemblGeneID) = c(levels(df_in$EnsemblGeneID),new_id)
+  
+  df_in[select_row,"EnsemblGeneID"] = new_id
+
+  return(df_in)
+}
+
+#666, 713  correct
+
+#348 ID is missing
+#https://www.genecards.org/cgi-bin/carddisp.pl?gene=MPC1L
+mito.df.sub = UpdateEnsemblID(mito.df.sub,348,"ENSG00000238205")
+
+#905 ID is missing
+#https://www.genecards.org/cgi-bin/carddisp.pl?gene=TSTD3
+mito.df.sub = UpdateEnsemblID(mito.df.sub, 905,"ENSG00000279170")
+
+#1107 ID is incorrect
+#https://www.genecards.org/cgi-bin/carddisp.pl?gene=CKMT1B
+mito.df.sub = UpdateEnsemblID(mito.df.sub, 1107,"ENSG00000237289")
+
+#1109 ID is incorrect
+#https://www.genecards.org/cgi-bin/carddisp.pl?gene=ATP5MF-PTCD1
+mito.df.sub = UpdateEnsemblID(mito.df.sub, 1109,"ENSG00000248919")
+
+#recheck to make sure errors have been resolved
+CheckDups(mito.df.sub)
+```
+
+Those errors are now resolved - check that all MitoCarta EnsemblID's are found in reference
+```{r}
+#first have to fix EnsemblID formatting
+SplitEId<- function(gr_in){
+  df_out=tidyr::separate(as.data.frame(gr_in),col = "gene_id",into = c("EnsemblID","EnsemblID_version"),sep = "[.]",remove = TRUE)
+  return(df_out)
+}
+gtf_genes_protein_coding_df=SplitEId(gtf_genes_protein_coding)
+
+#verify mc id's are in reference
+subset(mito.df.sub,!mito.df.sub$EnsemblID %in% gtf_genes_protein_coding_df$EnsemblID)
+
+```
+
+All ID's are found in reference, so we can check the overlaps to make sure the genes expected map to the reference
+```{r}
+GenerateGeneList <- function(mito_df, ref_gr, r_val){
+  
+  #Convert to GRanges obj
+  mito_gr=makeGRangesFromDataFrame(mito_df)
+  mito_gr
+  
+  #set range, find genes in each window
+  target_gr = subsetByOverlaps(ref_gr, mito_gr,type="start",maxgap = r_val)
+  target_gr
+  
+  #convert to df
+  target_df = as.data.frame(target_gr)
+  print(paste("increase from:",nrow(mito_df),"to", nrow(target_df)))
+  
+  return(target_df)
+  
+}
+
+#run overlap with exact start 
+overlap.df = GenerateGeneList(mito.df.sub,gtf_genes_protein_coding,0)
+overlap.df=SplitEId(overlap.df)
+gene.missing = subset(mito.df.sub,!mito.df.sub$EnsemblGeneID %in% overlap.df$EnsemblID)
+print(paste("The number of genes missing: ", nrow(gene.missing), sep=""))
+
+```
+
+Since there are only 43 of the 1158 genes that overlap, there is likely differences between MitoCarta2.0 start/stop seq and the reference. Update these to match the reference 
+```{r}
+#update gene start/stop to match ref, if gene found in ref
+for(rowpos in rownames(mito.df.sub)){
+  id=mito.df.sub[rowpos,"EnsemblGeneID"]
+  
+  if(id %in% unique(gtf_genes_protein_coding_df$EnsemblID)){
+    mito.df.sub[rowpos,"hg19_Start"]=as.numeric(subset(gtf_genes_protein_coding_df,EnsemblID==id)$start)[1]
+    mito.df.sub[rowpos,"hg19_Stop"]=as.numeric(subset(gtf_genes_protein_coding_df,EnsemblID==id)$end)[1]
+  }else{
+    next
+  }
+}
+
+#Repeat the overlapping
+overlap.df = GenerateGeneList(mito.df.sub,gtf_genes_protein_coding,0)
+overlap.df=SplitEId(overlap.df)
+gene.missing = subset(mito.df.sub,!mito.df.sub$EnsemblGeneID %in% overlap.df$EnsemblID)
+print(paste("The number of genes missing: ", nrow(gene.missing), sep=""))
+gene.missing
+```
+
+Now only 6 of the genes do not map as expected. Save this update mitocarta list for the project analysis
+```{r}
+#write out mitocarta list for use
+write.csv(mito.df.sub,"ref/human.mitocarta2.0_v2.txt")
+```
+
+
+
+

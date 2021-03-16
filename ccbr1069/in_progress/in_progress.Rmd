@@ -1,0 +1,1035 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+d ---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+**topGO analysis**
+```{r}
+library(topGO)
+library(ALL)
+data(ALL)
+data(geneList)
+
+affyLib <- paste(annotation(ALL), "db", sep = ".")
+library(package = affyLib, character.only = TRUE)
+library(GO.db)
+sampleGOdata <- new("topGOdata", description = "Simple session", ontology = "BP",
+                     allGenes = geneList, geneSel = topDiffGenes,
+                     nodeSize = 10, annot = annFUN.db, affyLib = affyLib)
+ 
+resultKS <- runTest(sampleGOdata, algorithm = "classic", statistic = "ks")
+resultKS
+resultKS.elim <- runTest(sampleGOdata, algorithm = "elim", statistic = "ks")
+resultKS.elim
+showSigOfNodes(sampleGOdata, score(resultKS.elim), firstSigNodes = 5, useInfo = 'all')
+
+allRes <- GenTable(GOdata, classic = resultFis, KS = resultKS, weight = resultWeight, orderBy = "weight", ranksOf = "classic", topNodes = 20)
+
+
+```
+
+
+
+##########################################################
+#TxDb; replaced
+```{r}
+#Create reference gene list
+ref.gr = GeneRanges(Homo.sapiens, column="SYMBOL")
+ref.gr
+  
+#Read in mito gene list
+mito.loc = "data/human.mitocarta2.0_v1.txt"
+mito.df = read.csv(mito.loc,sep='\t')
+mito.df.sub = mito.df[,c("hg19_Chromosome","hg19_Start","hg19_Stop","Symbol", "EnsemblGeneID")]
+
+#increase gene window
+mito.df.sub$hg19_Start = mito.df[,"hg19_Start"]-range.val
+mito.df.sub$hg19_Stop = mito.df[,"hg19_Stop"]+range.val
+  
+#Convert to GRanges obj
+mito.gr=makeGRangesFromDataFrame(mito.df.sub)
+
+#Find genes in each window
+target.gr = subsetByOverlaps(ref.gr, mito.gr)
+
+#convert to df
+target.df = as.data.frame(target.gr)
+
+#Find genes not in ref genome
+mito.missing = subset(mito.df,!mito.df$Symbol %in% target.df$SYMBOL)
+nrow(mito.missing)
+
+#write out missing genes
+write.csv(mito.missing[,c("Symbol","EnsemblGeneID")],"data/human.mitocarta2.0.toupdate.txt")
+
+#Reviewed gene list and made updates as needed
+
+CheckDups <- function(df.in){
+  #check for duplicate ensmebleid's
+  dup.list = df.in$EnsemblGeneID[duplicated(df.in$EnsemblGeneID)]
+  dup.df = subset(df.in,EnsemblGeneID %in% dup.list)
+  
+  print(paste("there are", nrow(dup.df), "duplicates"))
+  if(nrow(dup.df)>0){print(dup.df)}
+}
+
+CheckDups(mito.df)
+
+#TSTD3 has an updated EGID
+levels(mito.df$EnsemblGeneID) <- c(levels(mito.df$EnsemblGeneID),"ENSG00000279170")
+mito.df[905,"EnsemblGeneID"] = as.factor("ENSG00000279170")
+
+
+CheckDups(mito.df)
+#ATP5J2-PTCD1 is a genefusion, remove
+#https://www.genecards.org/cgi-bin/carddisp.pl?gene=ATP5MF-PTCD1&keywords=PTCD1
+mito.df = subset(mito.df,Symbol != "ATP5J2-PTCD1")
+
+CheckDups(mito.df)
+#CKMT1B has a different Ensembl ID than listed
+#https://www.genecards.org/cgi-bin/carddisp.pl?gene=CKMT1B&keywords=CKMT1B
+levels(mito.df$EnsemblGeneID) <- c(levels(mito.df$EnsemblGeneID),"ENSG00000237289")
+mito.df[1107,"EnsemblGeneID"] = as.factor("ENSG00000237289")
+
+CheckDups(mito.df)
+rownames(mito.df) = mito.df$EnsemblGeneID
+
+
+#Genes were annotated using the search feature on m.ensembl.org https://m.ensembl.org/biomart/martview/00ced47553ad1267008129ee136f8fd6
+
+
+mito.df.anno = read.csv("data/human.mitocarta2.0.updated.txt",sep="\t")
+rownames(mito.df.anno) = mito.df.anno$EnsemblGeneID
+
+for (selectrows in rownames(mito.df.anno)){
+  lookupid = as.character(mito.df.anno[selectrows,"EnsemblGeneID"])
+  newgene = as.character(mito.df.anno[selectrows,"corrected"])
+  
+  levels(mito.df$Symbol) <- c(levels(mito.df$Symbol),newgene)
+  mito.df[lookupid,"Symbol"] = newgene
+}
+  
+#Find genes still not in ref genome
+mito.missing = subset(mito.df,!mito.df$Symbol %in% target.df$SYMBOL)
+nrow(mito.missing)
+mito.missing$Symbol
+
+#determine which genes are still remaining
+mito.missing[1,"EnsemblGeneID"]
+
+table(mito.missing$hg19_Chromosome=="chrM")
+#13 on chrM
+#9 on others (6 (5),X (3),7 (1))
+
+#chrMT genes are being filtered during curation. 
+#source: https://support.bioconductor.org/p/64290/
+
+#manually search for remaining 9 genes, check they aren't in confirmed list
+SearchSyns <- function(syn_list){
+  counter=0
+  
+  for (syns in syn_list){
+    df.sub = subset(as.data.frame(ref.gr),SYMBOL==syns)
+
+    if(nrow(df.sub)==0){
+      next
+    }else{
+      print(paste("Gene Found:",syns))
+      counter=1
+    }
+  }
+  
+  if(counter==0 && sum(syn.list %in% gene.list.exp)==0){
+    print("Gene not found and not in confirmed list")
+  } else if (counter!=0 && sum(syn.list %in% gene.list.exp)==0){
+    print(paste("Gene not found but in confirmed list",syns))
+  }
+}
+
+#read in confirmed list
+gene.list.exp = toupper(read.csv("data/confirm_genelist.txt",header = FALSE)$V1)
+gene.list.exp
+
+#Misisng ids
+subset(mito.missing,hg19_Chromosome!="chrM")$EnsemblGeneID
+
+#ENSG00000112474
+syn.list = c("D6S2245E", "FABGL", "H2-KE6", "HKE6", "KE6", "RING2", "SDR30C1","HSD17B8")
+SearchSyns(syn.list)
+
+#ENSG00000204564 
+#https://uswest.ensembl.org/Homo_sapiens/Gene/Summary?g=ENSG00000204564;r=6:30647039-30653210
+syn_list = c("C6orf136", "Em:AB023049.8")
+SearchSyns(syn.list)
+
+#ENSG00000137411 
+#https://uswest.ensembl.org/Homo_sapiens/Gene/Summary?g=ENSG00000137411;r=6:30914205-30926459
+syn_list = c("VARS2","DKFZP434L1435", "G7a", "KIAA1885", "VARS2L", "VARSL")
+SearchSyns(syn.list)
+
+#ENSG00000203624
+#https://uswest.ensembl.org/Homo_sapiens/Gene/Summary?g=ENSG00000203624;r=CHR_HSCHR6_MHC_QBL_CTG1:30607204-30615890
+syn.list = c("C6orf14", "HSPC183", "MRPS18-2", "PTD017","MRPS18B")
+SearchSyns(syn.list)
+
+#ENSG00000169084
+#https://uswest.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=ENSG00000169084;r=X:2219506-2502805
+syn.list = c("DHRS5X", "DHRS5Y", "DHRSXY", "DHRSY", "SDR46C1", "SDR7C6", "DHRSX")
+SearchSyns(syn.list)
+
+#ENSG00000096150
+#https://uswest.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=ENSG00000096150;r=CHR_HSCHR6_MHC_QBL_CTG1:33200834-33205337
+syn.list = c("RPS18", "D6S218E", "HKE3", "KE-3", "KE3", "S18")
+SearchSyns(syn.list)
+ 
+#ENSG00000178605
+#https://uswest.ensembl.org/Homo_sapiens/Gene/Summary?db=core;g=ENSG00000178605;r=X:304529-318819
+syn.list = c("FLJ20977", "PGPL","GTPBP6")
+SearchSyns(syn.list)
+ 
+#ENSG00000169100
+#https://uswest.ensembl.org/Homo_sapiens/Gene/Summary?g=ENSG00000169100;r=X:1386152-1392113
+syn.list = c("SLC25A6","ANT3", "ANT3Y", "MGC17525")
+SearchSyns(syn.list)
+ 
+#ENSG00000174374
+#https://uswest.ensembl.org/Homo_sapiens/Gene/Idhistory?g=ENSG00000174374
+#archived
+
+#write final mito file
+write.csv(mito.df,"data/human.mitocarta2.0_v2.txt")
+```
+
+#Txdb; ref replaced
+```{r}
+txdb = read.gff(gff)
+txdb = txdb[,c("seqid","type","start","end","attributes")]
+txdb = subset(txdb,type=="gene")
+
+#split attribute col into features
+for (i in 1:nrow(txdb)){
+  txdb[i,"ID"] = str_split(str_split(txdb[i,"attributes"],";")[[1]][1],"=")[[1]][2]
+  txdb[i,"gene_id"] = str_split(str_split(txdb[i,"attributes"],";")[[1]][2],"=")[[1]][2]
+  txdb[i,"gene_type"] = str_split(str_split(txdb[i,"attributes"],";")[[1]][4],"=")[[1]][2]
+  txdb[i,"gene_name"] = str_split(str_split(txdb[i,"attributes"],";")[[1]][6],"=")[[1]][2]
+}
+txdb$attributes= NA #remove att col remaining
+
+```
+
+#Txdb; ref replaced
+```{r}
+##############################
+#Input: db of genes
+#output: db in generanger format
+##############################
+MakeRefDb <- function(){
+  #read in gff
+  txdb = read.gff('ref/gencode.v19.annotation.gff3')
+  txdb = txdb[,c("seqid","type","start","end","attributes")]
+  txdb = subset(txdb,type=="gene")
+  
+  #split attribute col into features
+  for (i in 1:nrow(txdb)){
+    txdb[i,"ID"] = str_split(str_split(txdb[i,"attributes"],";")[[1]][1],"=")[[1]][2]
+    txdb[i,"gene_id"] = str_split(str_split(txdb[i,"attributes"],";")[[1]][2],"=")[[1]][2]
+    txdb[i,"gene_type"] = str_split(str_split(txdb[i,"attributes"],";")[[1]][4],"=")[[1]][2]
+    txdb[i,"gene_name"] = str_split(str_split(txdb[i,"attributes"],";")[[1]][6],"=")[[1]][2]
+  }
+  txdb$attributes= NA #remove att col remaining
+  return(txdb)
+}
+```
+
+##########################################################
+## Generate heatmaps
+```{r}
+#complex heatmaps
+#reference: https://jokergoo.github.io/ComplexHeatmap-reference/book/
+
+heatmapOutput("test2", shortenStudyNames = TRUE, heatmapMargines = c(13,5), heatmapColor = "RdGr", genesToDrop = c("PVT1", "SNHG6"), reverseColor = FALSE, heatmapFileFormat = "JPG")
+```
+
+##########################################################
+### Review metadata
+```{r warning=FALSE}
+df.meta = data.frame()
+
+for (i in 491:ncol(df.clean)){
+ if(is.na(unique(subset(df.clean,df.clean[,"studyid"]=="metabric")[,i]))){
+   print(paste("metabric missing metadata",colnames(df.clean)[i]))
+ } else if (is.na(unique(subset(df.clean,df.clean[,"studyid"]=="tcga")[,i]))){
+    print(paste("tcga missing metadata",colnames(df.clean)[i]))
+ } else{
+   print(paste("metadata in both datasets",colnames(df.clean)[i]))
+ }
+}
+```
+
+###########################################################
+# Perform Clustering
+```{r}
+##############################
+## Perform clustering
+
+## Classificaitons
+## - -2 = homozygous deletion; -1 = hemizygous deletion; 
+## - 0  = neutral / no change; 1  = gain; 
+## - 2  = high level amplification.
+
+## reference: https://uc-r.github.io/kmeans_clustering
+##############################
+
+#subset df for genes that have data for each sample
+gene_max = 490
+df.genes = df.clean2[ , colSums(is.na(df.clean2[,2:gene_max])) == 0]
+colnames(df.genes)
+
+gene_max = 467
+tmp=data.frame()
+
+#search through metadata cols
+for(metacol in (gene_max+1):ncol(df.genes)){
+  df.sub = df.genes[,c(1:gene_max,metacol)]
+  
+  #for selected metadata, find all unique vals
+  for(feature in unique(df.sub[,gene_max+1])){
+    print(feature)
+  #  df.sub2 = subset(df.sub,df.sub[,gene_max+1]==feature)
+        
+  #  for(genecol in 2:(gene_max+1)){
+   #   tmp2[nrow(tmp)+1,"homodel"] = sum(df.sub2[,genecol] ==-2 )/nrow(df.sub2)
+  #    tmp2[nrow(tmp),"amp"] = sum(df.sub2[,genecol] ==2 )/nrow(df.sub2)
+  #   tmp2[nrow(tmp),"cat"] = colnames(df.sub)[metacol]
+   #   tmp2[nrow(tmp),"type"] = feature
+  #    tmp2[nrow(tmp),"gene"] = colnames(df.sub2)[genecol]
+  #  }
+    
+  }
+  
+}
+tmp2
+
+
+# Homo Deletions
+df.homo = df.genes[]
+#determine optimal cluster number
+set.seed(123)
+fviz_nbclust(df.genes, kmeans, method = "wss") #5 is opt
+fviz_nbclust(df.genes, kmeans, method = "silhouette") #4 is opt
+
+
+#set optimal number
+opt_num = 4
+
+# Compute k-means clustering with k = 4
+set.seed(123)
+final <- kmeans(consensus.freq, opt_num, nstart = 25)
+fviz_cluster(final, data = consensus.freq)
+
+#run stats
+consensus.freq %>%
+  mutate(Cluster = final$cluster) %>%
+  group_by(Cluster) %>%
+  summarise_all("mean")
+```
+
+#########################################################
+---
+title: "R Notebook"
+output: 
+  html_document: 
+    toc: yes
+  pdf_document: 
+    toc: yes
+editor_options: 
+  chunk_output_type: console
+---
+# Analysis for CCBR-1069
+
+##############################
+## Project Info
+From cBioPortal, obtain the following studies:
+- brca_meabric: Breast Cancer (METABRIC, Nature 2012 & Nat Commun 2016)
+
+ - https://www.cbioportal.org/study/summary?id=brca_metabric
+
+- brca_tcga_pub2015: Breast Invasive Carcinoma (TCGA, Cell 2015)
+
+ - https://www.cbioportal.org/study/summary?id=brca_tcga_pub2015
+
+##############################
+## Analysis
+
+**Create ref**
+```{r}
+#Only need to do once
+#BiocManager::install("TxDb.Hsapiens.UCSC.hg19.knownGene")
+#library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+#Homo.sapiens <- TxDb.Hsapiens.UCSC.hg19.knownGene
+```
+
+**Load packages**
+```{r message=FALSE,warning=FALSE}
+library(cgdsr)         # cbioportal access https://cran.r-project.org/web/packages/cgdsr/cgdsr.pdf
+library(plyr)
+library(tibble)
+library(tidyverse)     
+library(GenomicRanges)   # create expanded gene list
+library(Homo.sapiens)    # gene annotations
+library(VennDiagram)     # venn diagrams
+library(survival)        # survival curves
+library(survminer)       # survival plots
+library(clusterProfiler) # GO analysis
+library(ape) #read in gff obj
+
+library(cluster)         # clustering algorithms
+library(factoextra)      # clustering algorithms & visualization
+
+#suppress logs when venndiagrams are created
+futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger")
+```
+
+**Check portal**
+```{r}
+my.cgds = CGDS("http://www.cbioportal.org/")
+test(my.cgds)
+```
+
+## Data Processing
+**Functions**
+```{r}
+
+##############################
+#Input: db of genes
+#output: db in generanger format
+##############################
+MakeRefDb <- function(){
+  #read in gff
+  gtf = rtracklayer::import("ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz")
+
+  #subset to genes
+  gtf_genes=gtf[(GenomicRanges::elementMetadata(gtf)$type=="gene"),]
+  
+  #subset to protein coding
+  gtf_genes_protein_coding=gtf_genes[(GenomicRanges::elementMetadata(gtf_genes)$gene_type=="protein_coding"),]
+  
+  return(gtf_genes_protein_coding)
+}
+
+##############################
+#input: range to expand gene window, location of mito gene list file
+#output: all genes within gene window
+##############################
+CreateGeneList <- function(range.val,mito.loc,ref.gr){
+ 
+  #Read in mito gene list
+  mito.list = read.csv(mito.loc,sep=",")
+
+  #Convert to GRanges obj
+  mito.gr=makeGRangesFromDataFrame(mito.list)
+  
+  #Find genes in each window
+  target.gr = subsetByOverlaps(ref.gr, mito.gr,type="start",maxgap = range.val)
+  
+  #convert to df
+  target.df = as.data.frame(target.gr)
+
+  #optput gene list and count vals
+  print(paste("Original gene list: ",nrow(mito.list)," | New gene list: ", nrow(target.df),sep=""))
+  write.csv(target.df,"data/gene_list.txt")
+  
+  #return target df
+  return(target.df)
+}
+
+##############################
+#input: range to expande gene window, location of mito gene list file, study id, experiment number (genetic id)
+#output: counts matrix with clinical data
+##############################
+CgdsData <- function(range.val, mito.loc, study.id, genetic.id,ref.gr){
+  
+  #get study and caselist
+  return.list=CgdsProfile(study.id,'y')
+  cancer.study = return.list[[1]]
+  case.list = return.list[[2]]
+  
+  genetic.profile = getGeneticProfiles(my.cgds,cancer.study)[genetic.id,1]
+  
+  #Get gene list
+  gene.df = CreateGeneList(range.val,mito.loc,ref.gr)
+  gene.list = as.character(unique(gene.df[,"gene_name"]))
+
+  #portal will only generate data for 1174 genes at a time; otherwise error occurs
+  start = 1
+  end = 1174
+  df.data=data.frame()
+  while(start<length(gene.list)){
+    
+    if(end > length(gene.list)){
+      end = length(gene.list)
+    }
+    
+    #splice the gene list
+    gene.list.slice=gene.list[start:end]
+    
+    #get seq data for specific study, targeting gene list slice
+    df.slice = getProfileData(my.cgds,gene.list.slice,genetic.profile,case.list)
+    
+    #merge df with previous slices
+    df.data = merge(df.data,df.slice,by="row.names",all=TRUE)
+    row.names(df.data)=df.data$Row.names #add rownames back to df
+    df.data=df.data[,-1] #remove col named "row.names"
+
+    #increase counters
+    start=start+1174
+    end = end + 1174
+    
+  }
+  
+  # Get clinical data, add to df
+  clinical.data = getClinicalData(my.cgds,case.list)
+  df.out = merge(df.data,clinical.data,by="row.names",all=TRUE)
+  row.names(df.out)=df.out$Row.names #add rownames back to df
+  df.out=df.out[,-1] #remove col named "row.names"
+ 
+  return(df.out)
+}
+
+##############################
+#Input: df of raw df data, study id, classification types
+#Output: df of frequencies per classification type
+##############################
+GeneFreq <- function(df.counts,study.in,type.val){
+  df.sub = subset(df.counts,studyid==study.in)[,2:ncol(df.counts)]
+  
+  df.out = data.frame()
+  
+  for (type in type.val){
+    #add study id info
+    df.out[nrow(df.out)+1,"studyid"] = study.in
+    df.out[nrow(df.out),"classtype"] = type
+    
+    for (selectcol in colnames(df.sub)){
+      df.out[nrow(df.out),selectcol] = (sum(df.sub[,selectcol]==type,na.rm=T)/nrow(df.sub))*100
+    }
+  }
+  
+  return(df.out)
+}
+
+##############################
+### Input: gene list expected, gene list observed
+### Output: prints concordance or discordance
+##############################
+CheckGeneConcordance <- function(gene.exp, gene.obs){
+  #subset genes not in expected list
+  gene.check = gene.exp[which(!gene.exp %in% gene.obs)]
+  
+  if(length(gene.check)>1){
+    print("List is not concordant for the following genes:\n")
+    print(gene.check)
+  } else{
+    print("Gene list includes all expected genes")
+  }
+}
+
+##############################
+### Input: gene list , file name
+### Output: prints pie chart of chromosome locations
+##############################
+GeneratePieChart <- function(ref.gr,gene.list,file.in){
+  #generate df from genelist
+  df.gene=data.frame(gene.list,"Symbol")  #create tmp db of all imp genes
+  colnames(df.gene)=c("Symbol","LOC") #assign col name
+  levels(df.gene$LOC) = c(levels(df.gene$LOC),levels(df.ref.updated$seqnames))
+
+  for (rows in rownames(df.gene)){
+    gene = as.character(df.gene[rows,"Symbol"])
+    df.sub = subset(df.ref.updated,gene_name==gene)
+    df.gene[rows,"LOC"] = as.character(df.sub[,"seqnames"][1])
+  }
+  head(df.gene)
+  
+ 
+  
+  #Convert to table, fix labels
+  tbl.gene <- table(df.gene$LOC)
+  df.gene.anno = subset(as.data.frame(tbl.gene,stringsAsFactors=FALSE),Freq>0)
+  df.gene.anno$Var1 = mapvalues(df.gene.anno$Var1, 
+                                from=c("chr1","chr2","chr3","chr4","chr5","chr6","chr7","chr8","chr9"),
+                                to=c("chr01","chr02","chr03","chr04","chr05","chr06","chr07","chr08","chr09"))
+  df.gene.anno$Var1 = sort(df.gene.anno$Var1)
+
+  #create pie chart
+  x <-  df.gene.anno$Freq
+  labels <-  df.gene.anno$Var1
+  piepercent<- round(100*x/sum(x), 1)
+  
+  # Plot the chart.
+  png(file = file.in)
+  pie(x, labels = piepercent, main = "Significant Gene Location",col = rainbow(length(x)))
+  legend("bottomright", labels, cex = 0.8, fill = rainbow(length(x)))
+  dev.off()
+
+  {pie(x, labels = piepercent, main = "Significant Gene Location",col = rainbow(length(x)))
+  legend("bottomright", labels, cex = 0.8, fill = rainbow(length(x)))}
+}
+
+### Input: 2 gene lists, names of lists, color for filling, title, file name
+### Output: venn diagram saved as png
+##############################
+GenerateVennD <- function(list1,list2,list.names,list.cols,title.in,fname){
+  
+  venn.diagram(
+    #create venn
+    x=list(list1,list2),
+    category.names = list.names,
+    fill=list.cols,
+    
+    #title
+    main=title.in,
+    main.cex = 2,
+    
+    #output
+    filename = fname,
+    output=TRUE,
+  )
+}
+
+##############################
+### Input: studyid, df of frequencies, mutation type
+### Output: gene list of sig genes
+##############################
+FindSigGenes <- function(study.in,df.in,class.in){
+  
+  #only looking for amp-ed genes
+  df.check = subset(df.freq,classtype==class.in & studyid==study.in)
+  
+  for (selectcol in colnames(df.in[,2:ncol(df.in)])){
+    val = df.check[1,selectcol]
+    
+    if(is.na(val) | val<4.9){
+      df.check=subset(df.check,select=-(get(selectcol)))
+    } else{
+      next
+    }
+  }
+  
+  gene.list.obs = colnames(df.check)
+  return(gene.list.obs)
+}
+
+##############################
+#Input: factor to facet data, that includes OS_Months and OS_NUM (0=decesased, 1=alive)
+#Output: survival curve plot and statistics
+##############################
+#review differences between datasets
+GenerateSurvivalCurves <- function(df.in,factor.in,title.in,file.save,factor.list=""){
+  
+  #perform fit
+  fit <- survfit(Surv(OS_MONTHS, OS_NUM) ~get(factor.in), data = df.in)
+
+  # Visualize with survminer
+  if(length(factor.list)==1){
+    p = ggsurvplot(fit, data = df.in, pval = TRUE, risk.table=TRUE)
+  } else{
+    p = ggsurvplot(fit, data = df.in, pval = TRUE,risk.table=TRUE,
+                    legend.labs =factor.list, title=title.in)
+  }
+  
+  #Print survival curves
+  print(p)
+  ggsave(file.save,plot=print(p))
+}
+
+##############################
+#Input: takes in survival curve df to subset by gene
+#Output: outputs subset and reassigned df (2=altered, 0/1/-1/-2=unaltered)
+##############################
+SubSurvivalDF <- function(df.in,gene.in,study.in){
+  df.out = subset(df.in[,c(gene.in,"OS_NUM","OS_MONTHS","studyid")],studyid==study.in)
+
+  ##reassign values as 'altered' (!=0) or unaltered (=0)
+  df.out[,gene.in][df.out[,gene.in]!=2] <- "unaltered"
+  df.out[,gene.in][df.out[,gene.in]==2] <- "altered"
+  
+  #clean df
+  df.out[,gene.in] <- gsub("NaN",NA,df.out[,gene.in])
+  df.clean <- na.omit(df.out)
+
+  return(df.clean)
+}
+
+##############################
+### Input: gene list, df with survival data, studyid
+### Output: survival sig genes 
+##############################
+FindSigSurvival <- function(gene.list,df.in,study.in){
+  df.out=data.frame()
+  
+  for(selectgenes in gene.list){
+    #subset df for specific gene
+    df.tmp = SubSurvivalDF(df.in,selectgenes,study.in)
+  
+    #if subject vals for gene exisit
+    if(nrow(df.tmp)>0){
+      
+      #determine pval
+      diff = (survdiff(Surv(OS_MONTHS, OS_NUM) ~get(selectgenes), data = df.tmp))
+      p.val = round(1 - pchisq(diff$chisq, length(diff$n) - 1),digits=4)
+  
+      #record and flag sig
+      if(!is.na(p.val)){
+        df.out[nrow(df.out)+1,"pval"] = p.val
+        df.out[nrow(df.out),"gene"] = selectgenes
+        df.out[nrow(df.out),"study"] = study.in
+        df.out[nrow(df.out),"sig"]="N"
+        if(p.val<0.050){df.out[nrow(df.out),"sig"]="Y"}
+      }
+    } 
+  }
+  return(df.out)
+}
+
+
+```
+
+**Get data**
+```{r warning=FALSE}
+##############################
+## Input: study id, returnid if printout is required
+## Output: Printout if requested, obj of study and 
+##############################
+CgdsProfile <- function(study.id,return.id=''){
+  # Select specific cancer study
+  cancer.study = getCancerStudies(my.cgds)[study.id,1]
+  
+  # Get available case lists (collection of samples) for a given cancer study
+  case.list = getCaseLists(my.cgds,cancer.study)[1,1]
+  
+  # Return study and case list if retrun is Y, otherwise print for review
+  return.list = list(cancer.study,case.list)
+  if(return.id!=""){return(return.list)}
+  else{
+    # Get available genetic profiles
+    print(getGeneticProfiles(my.cgds,cancer.study))
+  }
+}
+
+# Get list of cancer studies from server, find row ID for studies
+getCancerStudies(my.cgds)[,1]
+# Selected :  ----------------------------------------
+#- [37] "brca_metabric"
+#- [47] "brca_tcga_pub2015" 
+
+#choose dataset for each study
+study.list = list("37","47")
+for (study.id in study.list){
+  CgdsProfile(study.id)
+}
+# Selected :  ----------------------------------------
+# - [37] "brca_metabric" choose dataset 1: brca_metabric_cna 
+# - [47] "brca_tcga_pub2015" choose dataset 2: brca_tcga_pub2015_gistic
+```
+
+Generate the gene lists
+```{r}
+#assign gene inclusion list, parameters
+mito.loc="ref/human.mitocarta2.0_v2.txt" #mito location
+range.val = 1000 #determine range to increase mito gene windows
+
+#create reference
+ref.gr = MakeRefDb()
+ref.gr
+
+#Run metabric
+study.id="37"
+genetic.id="1"
+df.metabric = CgdsData(range.val, mito.loc, study.id, genetic.id, ref.gr)
+df.metabric$studyid="metabric"
+df.metabric$subjid=row.names(df.metabric)
+
+#Run tcga
+study.id="47"
+genetic.id="2"
+df.tcga = CgdsData(range.val, mito.loc, study.id, genetic.id, ref.gr)
+df.tcga$studyid="tcga"
+df.tcga$subjid=row.names(df.tcga)
+
+#merge study dfs
+df.complete = merge(df.metabric,df.tcga,all=TRUE)
+
+#move descriptive cols to front
+df.complete <- subset(df.complete, select=c(studyid,1:(ncol(df.complete)-1)))
+
+#review df
+df.complete[1:5,1:5]
+remove(df.metabric,df.tcga)
+```
+
+**Clean df**
+```{r}
+# remove genes with no data for any sample
+df.clean = df.complete[,!colSums(is.na(df.complete))==nrow(df.complete)]
+
+# write out the genes removed
+write.csv(sort(colnames(df.complete)[!(colnames(df.complete) %in% colnames(df.clean))]),
+          paste("data/no_data_genes.txt",sep=""),row.names = FALSE)
+
+#remove samples with no data for any genes
+df.clean = df.clean[!rowSums(is.na(df.clean))>489,] #490 is n of genes
+
+# write out the samples removed
+write.csv(sort(rownames(df.complete)[!(rownames(df.complete) %in% rownames(df.clean))]),
+          paste("data/no_data_samples.txt",sep=""),row.names = FALSE)
+remove(df.complete)
+```
+
+**Determine amped genes **
+```{r}
+#### - classifications
+#### - -2 = homozygous deletion; -1 = hemizygous deletion; 
+#### - 0  = neutral / no change; 1  = gain; 
+#### - 2  = high level amplification.
+
+#remove all metadata but studyid
+df.genes = df.clean[,1:(ncol(df.clean)-130)]
+
+#run frequencies for metabric and tcga separately
+type.list = c(2,1,0,-1,-2)
+df.freq.m = GeneFreq(df.genes,"metabric",type.list) #only pass gene cols, there are 130 meta cols
+df.freq.t = GeneFreq(df.genes,"tcga",type.list) #only pass gene cols, there are 130 meta cols
+
+#merge dfs
+df.freq = rbind(df.freq.m,df.freq.t)
+remove(df.freq.m,df.freq.t)
+
+CompareGeneLists <- function(name.list1,g.list1,name.list2,g.list2){
+  in1not2 = subset(g.list1,!(g.list1 %in% g.list2)) 
+  print(paste("These",length(in1not2),"genes are only in",name.list1,":"))
+  print(in1not2)
+  
+  in2not1 = subset(g.list2,!(g.list2 %in% g.list1)) 
+  print(paste("These",length(in2not1),"genes are only in",name.list2,":"))
+  print(in2not1)
+
+
+  inboth = subset(g.list1,(g.list1 %in% g.list2)) 
+  print(paste("These",length(inboth),"genes are in both lists:"))
+  print(inboth)
+
+}
+
+#determine which genes amp >5% for each df
+gene.list.m = FindSigGenes("metabric",df.freq,"2")
+gene.list.t = FindSigGenes("tcga",df.freq,"2")
+
+
+CompareGeneLists("metabric",gene.list.m,"tcga",gene.list.t)
+
+##read in PI confirmed gene list, capitalize list
+gene.df.pi = read.csv("ref/confirm_genelist.txt",header = FALSE, 
+                             col.names=c("SYMBOL","M_AMP","T_AMP","M_SUR","T_SUR"),sep="\t",stringsAsFactors = FALSE)
+gene.df.pi$SYMBOL = toupper(gene.df.pi$SYMBOL)
+
+#Run concordance check
+gene.list.pi.m= subset(gene.df.pi,M_AMP>4.9)$SYMBOL
+CheckGeneConcordance(gene.list.pi.m,gene.list.m)
+
+gene.list.pi.t = subset(gene.df.pi,T_AMP>4.9)$SYMBOL
+CheckGeneConcordance(gene.list.pi.t,gene.list.t)
+
+CompareGeneLists("metabric",gene.list.pi.m,"tcga",gene.list.pi.t)
+
+CompareGeneLists("pi",gene.list.pi.m,"expand",gene.list.m)
+CompareGeneLists("pi",gene.list.pi.t,"expand",gene.list.t)
+
+
+```
+
+```{r}
+#determine which genes are not in ref
+df.ref = as.data.frame(ref.gr)
+df.ref.updated=tidyr::separate(df.ref,col = "gene_id",into = c("EnsemblID","EnsemblID_version"),sep = "[.]",remove = TRUE)
+rownames(df.ref.updated) = df.ref.updated$EnsemblID
+
+gene.list = union(gene.list.pi.m,gene.list.pi.t)
+gene.missing = subset(gene.list,!gene.list %in% df.ref$gene_name)
+gene.missing
+
+#Read in updated txt
+gene.updates = read.csv('ref/gene.updates.txt',sep="\t")[-1]
+rownames(gene.updates) = gene.updates$MitoCarta
+head(gene.updates)
+
+#https://www.genecards.org/cgi-bin/carddisp.pl?gene=MRPL58
+for (gene in gene.missing){
+  #find the eid
+  e.id = as.character(gene.updates[gene,"EnsemblGeneID"])
+  
+  #add gene as a factor
+  #levels(df.ref.updated$gene_name) = c(levels(df.ref.updated$gene_name),gene)
+  
+  #update ref gene name
+  df.ref.updated[e.id,"gene_name"] = gene
+  
+  print(paste("Update reference from",gene.updates[gene,"Ref"],"to",gene))
+}
+
+#check missing genes
+gene.missing = subset(gene.list,!gene.list %in% df.ref.updated$gene_name)
+gene.missing
+```
+
+```{r}
+#Create pie chart of chrom locations
+gene.list = union(gene.list.pi.m,gene.list.pi.t)
+file.save = "data/pie.chrom.loc.jpg"
+GeneratePieChart(ref.gr,union(gene.list.pi.m,gene.list.pi.t),file.save)
+
+#create ven digrams for each list
+##show original list
+file.save = "data/sig.amp_genes.pi.png"
+color.list =  c("light blue", "pink")
+venn.title = "Original Significant Gene List "
+GenerateVennD(gene.list.pi.m,gene.list.pi.t,c("Metabric","TCGA"),color.list,venn.title,file.save)
+print(paste("Total genes included:",length(union(gene.list.pi.m,gene.list.pi.t))))
+
+#show expanded gene list
+file.save = "data/sig.amp_genes.expanded.png"
+color.list =  c("light blue", "pink")
+venn.title = "Expanded Significant Gene List "
+GenerateVennD(gene.list.m,gene.list.t,c("Metabric","TCGA"),color.list,venn.title,file.save)
+print(paste("Total genes included:",length(union(gene.list.m,gene.list.t))))
+```
+
+
+**Survival curves**
+```{r warning=FALSE}
+#Reference: https://www.emilyzabor.com/tutorials/survival_analysis_in_r_tutorial.html
+
+#remove subjects without OS status
+df.survive = df.clean[!(df.clean$OS_STATUS==""),]
+df.survive = df.survive[!is.na(df.survive$OS_MONTHS),]
+
+#split OS_Status 0:DECEASED or 1:LIVING into OS_NUM (0,1) and OS_DESC (DECEASED,LIVING)
+df.survive <- df.survive %>%
+  separate(OS_STATUS,c("OS_NUM","OS_DESC"),":")
+df.survive$OS_NUM = as.numeric(df.survive$OS_NUM)
+
+#review differences between datasets
+factor.in = "studyid"
+strata.labels = c("Metabric","TCGA")
+file.save = "data/scurve.studies.png"
+title.in = "Survival Curve: Metabric vs TCGA"
+GenerateSurvivalCurves(df.survive,factor.in,title.in,file.save,strata.labels)
+# Note:  ----------------------------------------
+#p = 0.52; can merge datasets
+
+#reproduce curve from slide 11
+df.tmp = SubSurvivalDF(df.survive,"NDUFB9","metabric")
+
+factor.in = "NDUFB9"
+strata.labels = c("AMPed Group","Non-AMPed Group")
+file.save = "data/scurve.m_NDUFB9.png"
+title.in = "Survival Curve: NDUFB9 AMPed vs Non-AMPed"
+GenerateSurvivalCurves(df.tmp,factor.in,title.in,file.save,strata.labels)
+
+#Determine sig survival genes using PI data
+df.sig.m = FindSigSurvival(union(gene.list.pi.m,gene.list.pi.t),df.survive,"metabric")
+df.sig.t = FindSigSurvival(union(gene.list.pi.m,gene.list.pi.t),df.survive,"tcga")
+
+#check all expected genes are included?
+gene.list.e = subset(gene.df.pi,M_SUR<0.051)$SYMBOL
+gene.list.o =subset(df.sig.m,sig=="Y")$gene
+CheckGeneConcordance(gene.list.e,gene.list.o)
+
+#are there extra genes?, check pval diffs 
+CheckGeneConcordance(gene.list.o,gene.list.e)
+print(paste("Observed:", subset(df.sig.m,gene=="MRPL58")$pval," - Expected:", subset(gene.df.pi,SYMBOL=="MRPL58")$M_SUR))
+print(paste("Observed:", subset(df.sig.m,gene=="ATP5PD")$pval," - Expected:", subset(gene.df.pi,SYMBOL=="ATP5PD")$M_SUR))
+
+#merge df
+df.sig.pi = rbind(df.sig.m,df.sig.t)
+remove(df.sig.m,df.sig.t)
+
+#repeat for expanded list - determine sig survival genes using PI data
+df.sig.m = FindSigSurvival(union(gene.list.m,gene.list.t)[-1],df.survive,"metabric")#-1 removes studyid
+df.sig.t = FindSigSurvival(union(gene.list.m,gene.list.t)[-1],df.survive,"tcga")
+df.sig = rbind(df.sig.m,df.sig.t)
+remove(df.sig.m,df.sig.t)
+
+#create ven digrams for each list
+##show original list
+file.save = "data/sig.surv_genes.pi.png"
+color.list =  c("light blue", "pink")
+venn.title = "Original Significant Survival Gene List "
+GenerateVennD(subset(df.sig.pi,study=="metabric" & sig=="Y")$gene,
+              subset(df.sig.pi,study=="tcga" & sig=="Y")$gene,
+              c("Metabric","TCGA"),color.list,venn.title,file.save)
+print(paste("Total genes included:",nrow(subset(df.sig.pi,sig=="Y"))))
+
+##show expanded list
+file.save = "data/sig.surv_genes.expanded.png"
+color.list =  c("light blue", "pink")
+venn.title = "Expanded Significant Survival Gene List "
+GenerateVennD(subset(df.sig,study=="metabric" & sig=="Y")$gene,
+              subset(df.sig,study=="tcga" & sig=="Y")$gene,
+              c("Metabric","TCGA"),color.list,venn.title,file.save)
+print(paste("Total genes included:",nrow(subset(df.sig,sig=="Y"))))
+```
+
+Go analysis: 
+
+Use clusterprofiler to redo GO analysis for the 45 Metabric genes and the corresponding TCGA genes … See http://yulab-smu.top/clusterProfiler-book/chapter5.html 
+
+Also explore the cnetplot, heatplot and emapplot as options to identify key players …eg. which among the 45 is the most important gene
+**GO Analysis**
+```{r}
+library(clusterProfiler)
+library(Homo.sapiens)
+
+#subset metabric sig genes
+genes = subset(df.sig.pi,sig=="Y"&study=="metabric")$gene
+df.ref = read.csv("data/gene_list.txt",sep=",",stringsAsFactors=FALSE)
+gene.list = sort(df.ref$SYMBOL,decreasing=TRUE)
+gene.list
+
+#perform analysis
+go_enrich <- enrichGO(gene = genes,
+                      universe = names(gene.list),
+                      OrgDb = Homo.sapiens, 
+                      keyType = 'ENSEMBL',
+                      readable = T,
+                      ont = "BP",
+                      pvalueCutoff = 0.05, 
+                      qvalueCutoff = 0.10)
+
+#create barplot
+barplot(go_enrich, 
+        drop = TRUE, 
+        showCategory = 10, 
+        title = "GO Biological Pathways",
+        font.size = 8)
+
+
+#create cneplot
+cnetplot(go_enrich, categorySize="pvalue", foldChange=gene_list)
+
+
+#create heatplot
+
+#create emapplot
+emapplot(go_enrich)
+
+
+```
+
