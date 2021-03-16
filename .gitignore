@@ -132,4 +132,4 @@ dmypy.json
 iCLIP/
 
 #analysis folders
-**/analysis/**
+**/analysis
