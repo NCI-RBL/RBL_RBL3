@@ -1,7 +1,0 @@
-"Var1","Freq"
-"cellular anatomical entity",1
-"intracellular",1
-"other organism part",1
-"protein-containing complex",1
-"virion",1
-"virion part",1
