@@ -1,0 +1,48 @@
+# Global configuration file for the pipeline
+#path to rbl3 directory
+source_dir: "/data/CCBR/projects/rbl3/"
+
+#path to output directory
+output_dir: "/data/CCBR/projects/rbl3/pipe_out"
+
+#path to manifest files
+sample_manifest: "/data/CCBR/projects/rbl3/manifest/sample.tsv"
+
+#path to fastq files
+#fastq_dir: "/data/RBL_NCI/Gu/chunmei/nanopore/fastq_pass"
+fastq_dir: "/data/RBL_NCI/Gu/chunmei/nanopore_rawfastqs/"
+
+#user parameters
+annotation_id: "SIRV_annot"
+build_id: "SIRV"
+sequence_id: "Illumina"
+maxFracA: "0.5"
+minCount: "5"
+minDatasets: "2"
+
+#ref files
+annotation_gtf: "/data/CCBR_Pipeliner/db/PipeDB/Indices/GTFs/hg38/gencode.v30.annotation.gtf"
+annotation_fa: "/data/CCBR_Pipeliner/db/PipeDB/Indices/hg38_30/ref.fa"
+
+#modules, container parameters
+conda_dir: "/data/CCBR/projects/rbl3/dependencies/conda_envs/"
+minimap2: "minimap2/2.17"
+python: "python/3.7"
+talon: "/data/CCBR/projects/rbl3/dependencies/TALON-master"
+cupcake: "/data/CCBR/projects/rbl3/dependencies/cDNA_Cupcake"
+sqanti_yaml:  "/data/CCBR/projects/rbl3/dependencies/conda_envs/SQANTI3/SQANTI3.conda_env.yml"
+bedtools: "bedtools/2.29.2"
+
+bowtie2: "bowtie/2-2.3.4"
+fastq_screen: "fastq_screen/0.14.0"
+fastqc: "fastqc/0.11.9"
+java: "java/12.0.1"
+multiqc: "multiqc/1.9"
+novocraft: "novocraft/4.03.01"
+perl: "perl/5.24.3"
+Qt: "Qt/5.13.2"
+singularity: "singularity/3.7.0"
+samtools: "samtools/1.11"
+umitools: "umitools/1.1.1"
+subread: "subread/2.0.1"
+R: "R/4.0"
