@@ -80,18 +80,18 @@ talon_filter_transcripts \
        --minDatasets $minDatasets \
        --o "${out_dir}/filtered_transcripts.csv"
 
-#repeat abundance summaryon filtered transcripts
-talon_abundance \
-       --db "${out_dir}/example_talon.db" \
-       --whitelist "${out_dir}/filtered_transcripts.csv" \
-       -a $anno_id \
-       --build $build_id \
-       --o "${out_dir}/example"
+# #repeat abundance summaryon filtered transcripts
+# talon_abundance \
+#        --db "${out_dir}/example_talon.db" \
+#        --whitelist "${out_dir}/filtered_transcripts.csv" \
+#        -a $anno_id \
+#        --build $build_id \
+#        --o "${out_dir}/example"
 
-#create custom GTF of filtered transcripts
-talon_create_GTF \
-       --db "${out_dir}/example_talon.db" \
-       --whitelist "${out_dir}/filtered_transcripts.csv" \
-       -a $anno_id \
-       --build $build_id \
-       --o "${out_dir}/example"
+# #create custom GTF of filtered transcripts
+# talon_create_GTF \
+#        --db "${out_dir}/example_talon.db" \
+#        --whitelist "${out_dir}/filtered_transcripts.csv" \
+#        -a $anno_id \
+#        --build $build_id \
+#        --o "${out_dir}/example"
