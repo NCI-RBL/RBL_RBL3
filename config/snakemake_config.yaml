@@ -3,7 +3,7 @@
 source_dir: "/data/CCBR/projects/rbl3/"
 
 #path to output directory
-output_dir: "/data/CCBR/projects/rbl3/pipe_out"
+output_dir: "/scratch/kopardevn/rbl3_test_out"
 
 #path to manifest files
 sample_manifest: "/data/CCBR/projects/rbl3/manifest/sample.tsv"

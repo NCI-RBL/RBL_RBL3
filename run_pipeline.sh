@@ -1,4 +1,7 @@
 pipeline=$1
+PIPELINE_HOME=$(readlink -f $(dirname "$0"))
+SINGULARITY_BINDS="-B $PIPELINE_HOME:$PIPELINE_HOME"
+SINGULARITY_BINDS="$SINGULARITY_BINDS -B /data/CCBR_Pipeliner/:/data/CCBR_Pipeliner/"
 
 #handle yaml file
 parse_yaml() {
@@ -26,6 +29,7 @@ s_time=`date +"%Y%m%d_%H%M%S"`
 
 #clean config_output_dir
 output_dir=${config_output_dir}
+SINGULARITY_BINDS="$SINGULARITY_BINDS -B $output_dir:$output_dir"
 
 #Run pipeline on cluster or locally
 if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
@@ -52,11 +56,22 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
   #submit jobs to cluster
   if [[ $pipeline = "cluster" ]]; then
     sbatch --job-name="RBL3" --gres=lscratch:200 --time=120:00:00 --output=${output_dir}/log/%j_%x.out --mail-type=BEGIN,END,FAIL \
-    snakemake --use-envmodules --use-conda --conda-prefix ${config_conda_dir} --latency-wait 120  -s workflow/Snakefile --configfile ${output_dir}/log/${log_time}_snakemake_config.yaml \
-    --printshellcmds --cluster-config ${output_dir}/log/${log_time}_cluster_config.yml --keep-going \
-    --restart-times 1 --cluster "sbatch --gres {cluster.gres} --cpus-per-task {cluster.threads} \
+    snakemake \
+    --use-envmodules \
+    --rerun-incomplete \
+    --latency-wait 120 \
+    -s workflow/Snakefile \
+    --configfile ${output_dir}/log/${log_time}_snakemake_config.yaml \
+    --printshellcmds \
+    --cluster-config ${output_dir}/log/${log_time}_cluster_config.yml \
+    --keep-going \
+    --restart-times 1 \
+    --cluster "sbatch --gres {cluster.gres} --cpus-per-task {cluster.threads} \
     -p {cluster.partition} -t {cluster.time} --mem {cluster.mem} \
-    --job-name={params.rname} --output=${output_dir}/log/${s_time}_{params.rname}.out" -j 500 --rerun-incomplete
+    --job-name={params.rname} --output=${output_dir}/log/${s_time}_{params.rname}.out" \
+    -j 500 --rerun-incomplete \
+    --use-singularity \
+    --singularity-args "$SINGULARITY_BINDS"
 
   #submit jobs locally
   else
@@ -64,8 +79,16 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
     if [ -d "/tmp/iCount" ]; then 
       rm -r /tmp/iCount/ 
     fi
-    snakemake -s workflow/Snakefile --use-envmodules --configfile ${output_dir}/log/${log_time}_snakemake_config.yaml \
-    --printshellcmds --cluster-config ${output_dir}/log/${log_time}_cluster_config.yml --cores 8
+    snakemake \
+      -s workflow/Snakefile \
+      --use-envmodules \
+      --configfile ${output_dir}/log/${log_time}_snakemake_config.yaml \
+      --printshellcmds \
+      --cluster-config ${output_dir}/log/${log_time}_cluster_config.yml \
+      --cores 8 \
+      --use-singularity \
+      --rerun-incomplete \
+      --singularity-args "$SINGULARITY_BINDS"
   fi
 #Unlock pipeline
 elif [[ $pipeline = "unlock" ]]; then
