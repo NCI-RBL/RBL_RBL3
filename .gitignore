@@ -128,8 +128,13 @@ dmypy.json
 # Pyre type checker
 .pyre
 
-# folders already backedup elsewhere
-iCLIP/
+# remove output, dependencies
+pipe_out/
+dependencies/
+tutorial/
+talon_tmp/
 
-#analysis folders
-**/analysis/
+#remove unneded dir
+*.DS_Store
+*.Rproj*
+*.snakemake/
