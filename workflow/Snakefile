@@ -19,10 +19,12 @@ maxFracA=config['maxFracA']
 minCount=config['minCount']
 minDatasets=config['minDatasets']
 sequence_id=config['sequence_id']
+CAGE=config['CAGE']
 
 #ref information
 anno_gtf=config['annotation_gtf']
 anno_fa=config['annotation_fa']
+anno_gff=config['annotation_gff']
 
 #barcode list
 df_sample = pd.read_csv(sample_manifest,sep="\t")
@@ -46,7 +48,7 @@ def talon_config(wildcards):
     talon_config = join(out_dir,'talon', 'talon_config.csv')
     with open(talon_config, "w") as txt_file:
         for line in config_data:
-            txt_file.write(" ".join(line) + "\n")
+            txt_file.write(line + "\n")
 
 
 rule all:
@@ -63,10 +65,10 @@ rule all:
         join(out_dir,'talon', 'talon_config.csv'),
         join(out_dir,'talon', build_id + '.db'),
         expand(join(out_dir,'labeled','{bc}_labeled.sam'),bc=bc_list),
-        #join(out_dir,'talon', build_id + '_talon_QC.log'),
-        #join(out_dir,'talon', build_id + '_talon_summary.tsv'),
-        #join(out_dir,'counts',build_id + '_talon_abundance.txt'),
-        #join(out_dir,'counts',build_id + 'whitelist.txt'),
+        join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
+        join(out_dir,'talon', build_id + '_talon_summary.tsv'),
+        #join(out_dir,'counts', build_id + '_talon_abundance.txt'),
+        #join(out_dir,'counts', build_id + '_whitelist.txt'),
         #join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt'),
         #join(out_dir,'gtf', build_id + '_talon.gtf')
 
@@ -112,7 +114,7 @@ rule create_sam:
     shell:
         '''
         minimap2 \
-            -ax splice -t 30 -uf --secondary=no -C5 \
+            -ax splice -t 30 -uf --secondary=no -C5 --MD \
             {params.fa} {input.f1} > {output.sam};
         sort -k 3,3 -k 4,4n {output.sam} > {output.sam_sort}
         '''
@@ -159,6 +161,10 @@ rule talon_prime:
     '''
     interal primiing - how likely each read si will be used as an internal priming product
     labeling only - no reads are removed
+
+    tmp_dir needs to be unique to sample; otherwise run will fail as it attempts to write over
+    files with each sample
+    --deleteTmp
     '''
     input:
         f1 = join(out_dir,'sam','{bc}.sam'),
@@ -182,6 +188,7 @@ rule talon_prime:
             --t 1 \
             --ar 20 \
             --tmpDir={params.base_tmp} \
+            --deleteTmp \
             --o {params.base_sample}
         '''
 
@@ -196,20 +203,21 @@ rule talon_annotation:
         rname = "05_talon_anno",
         script_dir = talon_dir,
         b_id = build_id,
-        base = join(out_dir,'talon',build_id + "_")
+        base = join(out_dir,'talon',build_id)
     envmodules:
         config['python'],
     output:
-        o1 = join(out_dir,'talon', build_id + '_talon_QC.log'),
-        o2 = join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
+        o1 = join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
+        o2 = join(out_dir,'talon', build_id + '_QC.log'),
     shell:
         '''
+        rm -rf talon_tmp; 
         pip install {params.script_dir};
         talon \
             --f {input.t_config} \
             --db {input.db} \
             --build {params.b_id} \
-            --t 1 \
+            --t 5 \
             --o {params.base}
         '''
 
@@ -219,6 +227,7 @@ rule talon_summary:
     '''
     input:
         db = join(out_dir,'talon',build_id + '.db'),
+        anno = join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
     params:
         rname = "06_talon_summary",
         script_dir = talon_dir,
@@ -230,10 +239,7 @@ rule talon_summary:
     shell:
         '''
         pip install {params.script_dir};
-        talon_summarize \
-            --db {input.db} \
-            --v \
-            --o {params.base}
+        talon_summarize --db {input.db} --v --o {params.base}
         '''
 
 rule talon_counts:
@@ -255,11 +261,7 @@ rule talon_counts:
     shell:
         '''
         pip install {params.script_dir};
-        talon_abundance \
-            --db {input.db} \
-            -a {params.a_id} \
-            --build {params.b_id} \
-            --o {params.base}
+        talon_abundance --db {input.db} -a {params.a_id} --build {params.b_id} --o {params.base}
         '''
 
 rule talon_whitelist:
@@ -278,7 +280,7 @@ rule talon_whitelist:
     envmodules:
         config['python'],
     output:
-        o1 = join(out_dir,'counts',build_id + 'whitelist.txt')
+        o1 = join(out_dir,'counts',build_id + '_whitelist.txt')
     shell:
         '''
         pip install {params.script_dir};
@@ -297,9 +299,9 @@ rule talon_abundance_filtered:
     '''
     input:
         db = join(out_dir,'talon',build_id + '.db'),
-        white_list = join(out_dir,'counts',build_id + 'whitelist.txt')
+        white_list = join(out_dir,'counts',build_id + '_whitelist.txt')
     params:
-        rname = "07_talon_counts",
+        rname = "09_talon_counts",
         script_dir = talon_dir,
         a_id = annotation_id,
         b_id = build_id,
@@ -325,9 +327,9 @@ rule talon_gtf:
     '''
     input:
         db = join(out_dir,'talon',build_id + '.db'),
-        w_list = join(out_dir,'counts',build_id + 'whitelist.txt')
+        w_list = join(out_dir,'counts',build_id + '_whitelist.txt')
     params:
-        rname = "08_talon_gtf",
+        rname = "10_talon_gtf",
         script_dir = talon_dir,
         a_id = annotation_id,
         b_id = build_id,
@@ -382,14 +384,21 @@ rule squanti:
     '''
     remove params: 
     --polyA_motif_list  polyA.list
+
+    for short read data only:
+    --expression rsemQuantification.chr13.isoforms.results
+    -c star.SJ.out.tab \
+
     '''
     input:
         gtf = join(out_dir,'gtf', build_id + '_talon.gtf'),
         counts = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
     params:
-        rname = "sqanti",
+        rname = "11_sqanti",
         gtf = anno_gtf,
-        fa = anno_fa
+        fa = anno_fa,
+        cage = CAGE,
+        gff = anno_gff,
     envmodules:
         config['python'],
     conda:
@@ -400,13 +409,13 @@ rule squanti:
         '''
         python sqanti3_qc.py \
             --gtf {input.gtf} {params.gtf} {params.fa} \
-            --cage_peak hg38.cage_peaks.chr13.bed  \
-            --expression rsemQuantification.chr13.isoforms.results \
+            --cage_peak {params.cage} \
             --fl_count {input.counts} \
-            -c star.SJ.out.tab \
             --isoAnnotLite \
-            --gff3 tappAS.input.gff3
+            --gff3 {params.gff}
         '''
+
+
 '''
 rule :
     input:
