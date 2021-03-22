@@ -19,12 +19,12 @@ maxFracA=config['maxFracA']
 minCount=config['minCount']
 minDatasets=config['minDatasets']
 sequence_id=config['sequence_id']
-CAGE=config['CAGE']
+# CAGE=config['CAGE']
 
 #ref information
 anno_gtf=config['annotation_gtf']
 anno_fa=config['annotation_fa']
-anno_gff=config['annotation_gff']
+# anno_gff=config['annotation_gff']
 
 #barcode list
 df_sample = pd.read_csv(sample_manifest,sep="\t")
@@ -67,10 +67,10 @@ rule all:
         expand(join(out_dir,'labeled','{bc}_labeled.sam'),bc=bc_list),
         join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
         join(out_dir,'talon', build_id + '_talon_summary.tsv'),
-        #join(out_dir,'counts', build_id + '_talon_abundance.txt'),
-        #join(out_dir,'counts', build_id + '_whitelist.txt'),
-        #join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt'),
-        #join(out_dir,'gtf', build_id + '_talon.gtf')
+        join(out_dir,'counts', build_id + '_talon_abundance.txt'),
+        join(out_dir,'counts', build_id + '_whitelist.txt'),
+        join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt'),
+        join(out_dir,'gtf', build_id + '_talon.gtf')
 
 
         #collapsed files
@@ -143,13 +143,11 @@ rule talon_db:
         a_id = annotation_id,
         b_id = build_id,
         base = join(out_dir,'talon',build_id)
-    envmodules:
-        config['python'],
     output:
         o1 = join(out_dir,'talon',build_id + '.db')
+    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
     shell:
         '''
-        pip install {params.script_dir};
         talon_initialize_database \
             --f {input.anno} \
             --a {params.a_id}\
@@ -174,15 +172,12 @@ rule talon_prime:
         anno = anno_fa,
         base_tmp = join(out_dir,'tmp' + '_' + '{bc}'),
         base_sample = join(out_dir,'labeled','{bc}')
-    envmodules:
-        config['python'],
-        config['bedtools']
     output:
         o1 = join(out_dir,'labeled','{bc}_labeled.sam'),
         o2 = join(out_dir,'labeled','{bc}_read_labels.tsv'),
+    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
     shell:
         '''
-        pip install {params.script_dir} ;
         talon_label_reads --f {input.f1} \
             --g {params.anno} \
             --t 1 \
@@ -204,15 +199,13 @@ rule talon_annotation:
         script_dir = talon_dir,
         b_id = build_id,
         base = join(out_dir,'talon',build_id)
-    envmodules:
-        config['python'],
     output:
         o1 = join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
         o2 = join(out_dir,'talon', build_id + '_QC.log'),
+    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
     shell:
         '''
         rm -rf talon_tmp; 
-        pip install {params.script_dir};
         talon \
             --f {input.t_config} \
             --db {input.db} \
@@ -232,13 +225,11 @@ rule talon_summary:
         rname = "06_talon_summary",
         script_dir = talon_dir,
         base = join(out_dir,'talon', build_id)
-    envmodules:
-        config['python'],
     output:
         o1 = join(out_dir,'talon', build_id + '_talon_summary.tsv')
+    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
     shell:
         '''
-        pip install {params.script_dir};
         talon_summarize --db {input.db} --v --o {params.base}
         '''
 
@@ -254,13 +245,11 @@ rule talon_counts:
         a_id = annotation_id,
         b_id = build_id,
         base = join(out_dir,'counts', build_id)
-    envmodules:
-        config['python'],
     output:
         o1 = join(out_dir,'counts', build_id + '_talon_abundance.txt')
+    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
     shell:
         '''
-        pip install {params.script_dir};
         talon_abundance --db {input.db} -a {params.a_id} --build {params.b_id} --o {params.base}
         '''
 
@@ -277,13 +266,11 @@ rule talon_whitelist:
         max_frac  = maxFracA,
         min_count = minCount,
         min_ds = minDatasets
-    envmodules:
-        config['python'],
     output:
         o1 = join(out_dir,'counts',build_id + '_whitelist.txt')
+    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
     shell:
         '''
-        pip install {params.script_dir};
         talon_filter_transcripts \
             --db {input.db} \
             -a {params.a_id} \
@@ -306,13 +293,11 @@ rule talon_abundance_filtered:
         a_id = annotation_id,
         b_id = build_id,
         base = join(out_dir,'counts', build_id)
-    envmodules:
-        config['python'],
     output:
         o1 = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
+    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
     shell:
         '''
-        pip install {params.script_dir};
         talon_abundance \
             --db {input.db} \
             -a {params.a_id} \
@@ -334,13 +319,11 @@ rule talon_gtf:
         a_id = annotation_id,
         b_id = build_id,
         base = join(out_dir,'gtf', build_id)
-    envmodules:
-        config['python'],
     output:
         o1 = join(out_dir,'gtf', build_id + '_talon.gtf')
+    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
     shell:
         '''
-        pip install {params.script_dir};
         talon_create_GTF \
             --db {input.db} \
             --whitelist {input.w_list} \
@@ -371,7 +354,6 @@ rule collapse:
         o4 = join(out_dir,'collapsed','{bc}.ignored_ids.txt'),
     shell:
         '''
-        pip install {params.script_dir};
         python {params.py} \
             --input {input.f1} \
             --fq \
@@ -380,51 +362,51 @@ rule collapse:
             -o {params.bc}
         '''
 
-rule squanti:
-    '''
-    remove params: 
-    --polyA_motif_list  polyA.list
+# rule squanti:
+#     '''
+#     remove params: 
+#     --polyA_motif_list  polyA.list
 
-    for short read data only:
-    --expression rsemQuantification.chr13.isoforms.results
-    -c star.SJ.out.tab \
+#     for short read data only:
+#     --expression rsemQuantification.chr13.isoforms.results
+#     -c star.SJ.out.tab \
 
-    '''
-    input:
-        gtf = join(out_dir,'gtf', build_id + '_talon.gtf'),
-        counts = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
-    params:
-        rname = "11_sqanti",
-        gtf = anno_gtf,
-        fa = anno_fa,
-        cage = CAGE,
-        gff = anno_gff,
-    envmodules:
-        config['python'],
-    conda:
-        config['sqanti_yaml']
-    output:
-        o1 = join(out_dir,'tbd')
-    shell:
-        '''
-        python sqanti3_qc.py \
-            --gtf {input.gtf} {params.gtf} {params.fa} \
-            --cage_peak {params.cage} \
-            --fl_count {input.counts} \
-            --isoAnnotLite \
-            --gff3 {params.gff}
-        '''
+#     '''
+#     input:
+#         gtf = join(out_dir,'gtf', build_id + '_talon.gtf'),
+#         counts = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
+#     params:
+#         rname = "11_sqanti",
+#         gtf = anno_gtf,
+#         fa = anno_fa,
+#         cage = CAGE,
+#         gff = anno_gff,
+#     envmodules:
+#         config['python'],
+#     conda:
+#         config['sqanti_yaml']
+#     output:
+#         o1 = join(out_dir,'tbd')
+#     shell:
+#         '''
+#         python sqanti3_qc.py \
+#             --gtf {input.gtf} {params.gtf} {params.fa} \
+#             --cage_peak {params.cage} \
+#             --fl_count {input.counts} \
+#             --isoAnnotLite \
+#             --gff3 {params.gff}
+#         '''
 
 
-'''
-rule :
-    input:
-        f1 = 
-    params:
-        rname = "create_sam",
-    envmodules:
-        config[''],
-    output:
-        o1 = 
-    shell:
-'''
+# '''
+# rule :
+#     input:
+#         f1 = 
+#     params:
+#         rname = "create_sam",
+#     envmodules:
+#         config[''],
+#     output:
+#         o1 = 
+#     shell:
+# '''
