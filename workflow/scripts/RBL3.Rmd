@@ -1,19 +1,27 @@
 ---
-title: "RBL3"
+title: "Transcript Types"
 output: html_document
-editor_options: 
-  chunk_output_type: console
+params:
+  f_data: 
+    value: "example_talon_abundance_filtered.tsv"
+  u_data: 
+      value: "example_talon_abundance.tsv"
+  perc_sim:
+      value: x
+  num_math:
+      value: x
 ---
+
 # Project Title
 Drosha regulates mRNA splicing or decay
+
 ## Description
 The project is to investigate Drosha-regulated genes and the mRNA splicing pattern in Drosha-KO.
-
 
 I have wildtype cells and Drosha-KO, Dicer-KO, DGCR8-KO, Drosha-Dicer-DKO and DGCR8-Dicer-DKO cells. I would like to check which genes are regulated by Drosha, and whether Drosha will change the mRNA splicing pattern using Nanopore mRNA-seq .
 Specifically, I would like to check whether Drosha regulates IGF2 by mRNA decay or alternative splicing. Thus, my question is: can I use Nanopore to detect the mRNA decay and alternative splicing by using a bioinformatics approach?
 
-```{r}
+```{r, echo=FALSE, warning=FALSE}
 library(dplyr)
 library(ggplot2)
 library(tidyverse)
@@ -23,16 +31,15 @@ library(ggpubr)
 #https://www.biorxiv.org/content/10.1101/672931v2.supplementary-material
 ```
 
-
-```{r setup, include=FALSE}
-data_dir = "/Volumes/projects/rbl3/tutorial/"
+```{r Params, echo=FALSE}
+filtered_data = params$f_data
+unfiltered_data = params$u_data
 ```
 
-#abundance tables
-```{r}
+```{r, echo=FALSE}
 #plot transcript read lengths, read counts, exon counts
 TranscriptFeatures <- function(df_in,title_in) {
-  abund_df = read.csv(paste0(data_dir,df_in),sep="\t")
+  abund_df = read.csv(df_in,sep="\t")
   
   p1 = ggplot(abund_df, aes(x=transcript_novelty, y=length, fill=transcript_novelty)) + 
     geom_violin(trim=FALSE)+
@@ -71,22 +78,22 @@ TranscriptFeatures <- function(df_in,title_in) {
             labels = c("A", "B", "C"),
             ncol = 2, nrow = 2)
 } 
-
-
-#plot unfiltered
-TranscriptFeatures("example_talon_abundance.tsv","    Unfiltered Data")
-
-#plot filtered; either:
-#- transcripts are known OR
-#- reads must have <50% A in the 20bp interval after alignmnet and 
-#be detected at least 5 times in both replicates
-#ISM - incomplete splice match; NIC - novel in catalog; NNC - novel not in catalog
-TranscriptFeatures("example_talon_abundance_filtered.tsv","     Filtered Data")
-
-
 ```
 
+## Transcript Type
+**Transcripts are plotted prior to filtering by type, with the following key:**
+* ISM: incomplete splice match
+* NIC: novel in catalog
+* NNC: novel not in catalog
 ```{r}
-#reads messanger? full length mRNA? truncated mRNA?
+#plot unfiltered
+TranscriptFeatures(unfiltered_data,"    Unfiltered Data")
 ```
 
+**Transcripts are then filtered based on the following criteria**
+A) transcripts are known OR
+B) reads must have < param$perc_sim A in the 20bp interval after alignment AND 
+be detected at least param$num_match times in both replicates
+```{r}
+TranscriptFeatures(filtered_data,"     Filtered Data")```
+```
