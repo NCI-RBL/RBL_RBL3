@@ -243,6 +243,7 @@ rule talon_counts:
     '''
     input:
         db = join(out_dir,'talon',build_id + '.db'),
+        anno = join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
     params:
         rname = "07_talon_counts",
         script_dir = talon_dir,
@@ -263,6 +264,7 @@ rule talon_whitelist:
     '''
     input:
         db = join(out_dir,'talon',build_id + '.db'),
+        anno = join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
     params:
         rname = "08_talon_wl",
         script_dir = talon_dir,
