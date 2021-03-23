@@ -368,40 +368,41 @@ rule collapse:
             -o {params.bc}
         '''
 
-# rule squanti:
-#     '''
-#     remove params: 
-#     --polyA_motif_list  polyA.list
+rule squanti:
+    '''
+    remove params: 
+    --polyA_motif_list  polyA.list
 
-#     for short read data only:
-#     --expression rsemQuantification.chr13.isoforms.results
-#     -c star.SJ.out.tab \
+    for short read data only:
+    --expression rsemQuantification.chr13.isoforms.results
+    -c star.SJ.out.tab \
 
-#     '''
-#     input:
-#         gtf = join(out_dir,'gtf', build_id + '_talon.gtf'),
-#         counts = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
-#     params:
-#         rname = "11_sqanti",
-#         gtf = anno_gtf,
-#         fa = anno_fa,
-#         cage = CAGE,
-#         gff = anno_gff,
-#     envmodules:
-#         config['python'],
-#     conda:
-#         config['sqanti_yaml']
-#     output:
-#         o1 = join(out_dir,'tbd')
-#     shell:
-#         '''
-#         python sqanti3_qc.py \
-#             --gtf {input.gtf} {params.gtf} {params.fa} \
-#             --cage_peak {params.cage} \
-#             --fl_count {input.counts} \
-#             --isoAnnotLite \
-#             --gff3 {params.gff}
-#         '''
+    '''
+    input:
+        gtf = join(out_dir,'gtf', build_id + '_talon.gtf'),
+        counts = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
+    params:
+        rname = "11_sqanti",
+        gtf = anno_gtf,
+        fa = anno_fa,
+        cage = CAGE,
+        gff = anno_gff,
+    container: "docker://nciccbr/ccbr_sqanti_3:latest"
+    output:
+        o1 = join(out_dir,'tbd')
+    shell:
+        '''
+        sqanti3_qc.py \
+            --gtf {input.gtf} {params.gtf} {params.fa} \
+            --cage_peak {params.cage} \
+            --fl_count {input.counts} \
+            --isoAnnotLite \
+            --gff3 {params.gff}
+        '''
+
+
+#sqanti3_qc.py and sqanti3_RulesFilter.py work directly without the python prefix ... 
+#I have made them executable inside the docker ... let me know if it works
 
 
 # '''
