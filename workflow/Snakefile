@@ -50,8 +50,8 @@ def talon_config(wildcards):
         for line in config_data:
             txt_file.write(line + "\n")
 
-local rules : talon_config
- 
+localrules: talon_config
+
 rule all:
     input:
         #input fastq files
@@ -68,10 +68,10 @@ rule all:
         expand(join(out_dir,'labeled','{bc}_labeled.sam'),bc=bc_list),
         join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
         join(out_dir,'talon', build_id + '_talon_summary.tsv'),
-        #oin(out_dir,'counts', build_id + '_talon_abundance.txt'),
-        #join(out_dir,'counts', build_id + '_whitelist.txt'),
-        #join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt'),
-        #join(out_dir,'gtf', build_id + '_talon.gtf')
+        join(out_dir,'counts', build_id + '_talon_abundance.txt'),
+        join(out_dir,'counts', build_id + '_whitelist.txt'),
+        join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt'),
+        join(out_dir,'gtf', build_id + '_talon.gtf')
 
 
         #collapsed files
@@ -194,7 +194,8 @@ rule talon_annotation:
     '''
     input:
         db = join(out_dir, 'talon', build_id + '.db'),
-        t_config = join(out_dir, 'talon', 'talon_config.csv')
+        t_config = join(out_dir, 'talon', 'talon_config.csv'),
+        sam = expand(join(out_dir,'labeled','{bc}_labeled.sam'),bc=bc_list)
     params:
         rname = "05_talon_anno",
         script_dir = talon_dir,
