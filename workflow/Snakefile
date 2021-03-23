@@ -50,7 +50,8 @@ def talon_config(wildcards):
         for line in config_data:
             txt_file.write(line + "\n")
 
-
+local rules : talon_config
+ 
 rule all:
     input:
         #input fastq files
@@ -67,10 +68,10 @@ rule all:
         expand(join(out_dir,'labeled','{bc}_labeled.sam'),bc=bc_list),
         join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
         join(out_dir,'talon', build_id + '_talon_summary.tsv'),
-        join(out_dir,'counts', build_id + '_talon_abundance.txt'),
-        join(out_dir,'counts', build_id + '_whitelist.txt'),
-        join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt'),
-        join(out_dir,'gtf', build_id + '_talon.gtf')
+        #oin(out_dir,'counts', build_id + '_talon_abundance.txt'),
+        #join(out_dir,'counts', build_id + '_whitelist.txt'),
+        #join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt'),
+        #join(out_dir,'gtf', build_id + '_talon.gtf')
 
 
         #collapsed files
