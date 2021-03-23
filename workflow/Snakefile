@@ -201,6 +201,8 @@ rule talon_annotation:
         script_dir = talon_dir,
         b_id = build_id,
         base = join(out_dir,'talon',build_id)
+    envmodules:
+        config['bedtools']
     output:
         o1 = join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
         o2 = join(out_dir,'talon', build_id + '_QC.log'),
