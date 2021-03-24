@@ -19,7 +19,7 @@ maxFracA=config['maxFracA']
 minCount=config['minCount']
 minDatasets=config['minDatasets']
 sequence_id=config['sequence_id']
-# CAGE=config['CAGE']
+primer_len=config['primer_length']
 
 #ref information
 anno_gtf=config['annotation_gtf']
@@ -179,6 +179,7 @@ rule talon_prime:
         anno = anno_fa,
         base_tmp = join(out_dir,'tmp' + '_' + '{bc}'),
         base_sample = join(out_dir,'04_sam_labeled','{bc}'),
+        p_len = primer_len
     output:
         o1 = join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),
         o2 = join(out_dir,'04_sam_labeled','{bc}_read_labels.tsv'),
@@ -188,7 +189,7 @@ rule talon_prime:
         talon_label_reads --f {input.f1} \
             --g {params.anno} \
             --t 1 \
-            --ar 20 \
+            --ar {params.p_len} \
             --tmpDir={params.base_tmp} \
             --deleteTmp \
             --o {params.base_sample}

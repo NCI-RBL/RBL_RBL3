@@ -3,7 +3,7 @@
 source_dir: "/data/CCBR/projects/rbl3/"
 
 #path to output directory
-output_dir: "/scratch/kopardevn/rbl3_test_out"
+output_dir: "/data/sevillas2/rbl3"
 
 #path to manifest files
 sample_manifest: "/data/CCBR/projects/rbl3/manifest/sample.tsv"
@@ -19,19 +19,23 @@ sequence_id: "Illumina"
 maxFracA: "0.5"
 minCount: "5"
 minDatasets: "2"
+primer_length: "20" #match the length of the T sequence in your primer, default [20]
 
 #ref files
 annotation_gtf: "/data/CCBR_Pipeliner/db/PipeDB/Indices/GTFs/hg38/gencode.v30.annotation.gtf"
 annotation_fa: "/data/CCBR_Pipeliner/db/PipeDB/Indices/hg38_30/ref.fa"
+annotation_gff: "/data/CCBR/projects/rbl3/Homo_sapiens_GRCh38_Ensembl_86.gff3"
 
 #modules, container parameters
 conda_dir: "/data/CCBR/projects/rbl3/dependencies/conda_envs/"
 minimap2: "minimap2/2.17"
 python: "python/3.7"
-talon: "/data/CCBR/projects/rbl3/dependencies/TALON-master"
-cupcake: "/data/CCBR/projects/rbl3/dependencies/cDNA_Cupcake"
-sqanti_yaml:  "/data/CCBR/projects/rbl3/dependencies/conda_envs/SQANTI3/SQANTI3.conda_env.yml"
 bedtools: "bedtools/2.29.2"
+talon: "docker://nciccbr/ccbr_talon_v5.0:latest"
+singularity: "singularity/3.7.0"
+talon_dir: "/data/CCBR/projects/rbl3/dependencies/TALON-master"
+#cupcake: "/data/CCBR/projects/rbl3/dependencies/cDNA_Cupcake"
+#sqanti_yaml:  "/data/CCBR/projects/rbl3/dependencies/conda_envs/SQANTI3/SQANTI3.conda_env.yml"
 
 bowtie2: "bowtie/2-2.3.4"
 fastq_screen: "fastq_screen/0.14.0"
@@ -41,7 +45,6 @@ multiqc: "multiqc/1.9"
 novocraft: "novocraft/4.03.01"
 perl: "perl/5.24.3"
 Qt: "Qt/5.13.2"
-singularity: "singularity/3.7.0"
 samtools: "samtools/1.11"
 umitools: "umitools/1.1.1"
 subread: "subread/2.0.1"
