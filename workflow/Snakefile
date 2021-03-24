@@ -145,8 +145,13 @@ rule talon_db:
         b_id = build_id,
         base = join(out_dir,'03_talon',build_id)
     output:
+<<<<<<< HEAD
         o1 = join(out_dir,'03_talon',build_id + '.db')
-    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+=======
+        o1 = join(out_dir,'talon',build_id + '.db')
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+>>>>>>> b908b759e516b41e4e9a6fc5e1c803419d1ddb3b
     shell:
         '''
         talon_initialize_database \
@@ -179,9 +184,15 @@ rule talon_prime:
         base_sample = join(out_dir,'04_sam_labeled','{bc}'),
         p_len = primer_len
     output:
+<<<<<<< HEAD
         o1 = join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),
         o2 = join(out_dir,'04_sam_labeled','{bc}_read_labels.tsv'),
-    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+=======
+        o1 = join(out_dir,'labeled','{bc}_labeled.sam'),
+        o2 = join(out_dir,'labeled','{bc}_read_labels.tsv'),
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+>>>>>>> b908b759e516b41e4e9a6fc5e1c803419d1ddb3b
     shell:
         '''
         talon_label_reads --f {input.f1} \
@@ -208,10 +219,16 @@ rule talon_annotation:
         base_tmp = join(out_dir,'tmp_annotations'),
         base_sample = join(out_dir,'05_annotation',build_id)
     output:
+<<<<<<< HEAD
         o1 = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
         o2 = join(out_dir,'05_annotation', build_id + '_QC.log'),
     envmodules:
         config['python'],
+=======
+        o1 = join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
+        o2 = join(out_dir,'talon', build_id + '_QC.log'),
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+>>>>>>> b908b759e516b41e4e9a6fc5e1c803419d1ddb3b
     shell:
         '''
         rm -rf talon_tmp; 
@@ -236,8 +253,13 @@ rule talon_summary:
         script_dir = talon_dir,
         base = join(out_dir,'06_read_counts', build_id)
     output:
+<<<<<<< HEAD
         o1 = join(out_dir,'06_read_counts', build_id + '_talon_summary.tsv')
-    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+=======
+        o1 = join(out_dir,'talon', build_id + '_talon_summary.tsv')
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+>>>>>>> b908b759e516b41e4e9a6fc5e1c803419d1ddb3b
     shell:
         '''
         talon_summarize --db {input.db} --v --o {params.base}
@@ -257,8 +279,13 @@ rule talon_counts:
         b_id = build_id,
         base = join(out_dir,'06_read_counts', build_id)
     output:
+<<<<<<< HEAD
         o1 = join(out_dir,'06_read_counts', build_id + '_talon_abundance.tsv')
-    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+=======
+        o1 = join(out_dir,'counts', build_id + '_talon_abundance.txt')
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+>>>>>>> b908b759e516b41e4e9a6fc5e1c803419d1ddb3b
     shell:
         '''
         talon_abundance --db {input.db} -a {params.a_id} --build {params.b_id} --o {params.base}
@@ -279,8 +306,13 @@ rule talon_whitelist:
         min_count = minCount,
         min_ds = minDatasets
     output:
+<<<<<<< HEAD
         o1 = join(out_dir,'06_read_counts',build_id + '_whitelist.txt')
-    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+=======
+        o1 = join(out_dir,'counts',build_id + '_whitelist.txt')
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+>>>>>>> b908b759e516b41e4e9a6fc5e1c803419d1ddb3b
     shell:
         '''
         talon_filter_transcripts \
@@ -306,8 +338,13 @@ rule talon_abundance_filtered:
         b_id = build_id,
         base = join(out_dir,'06_read_counts', build_id)
     output:
+<<<<<<< HEAD
         o1 = join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv')
-    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+=======
+        o1 = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+>>>>>>> b908b759e516b41e4e9a6fc5e1c803419d1ddb3b
     shell:
         '''
         talon_abundance \
@@ -332,8 +369,13 @@ rule talon_gtf:
         b_id = build_id,
         base = join(out_dir,'gtf', build_id)
     output:
+<<<<<<< HEAD
         o1 = join(out_dir,'07_gtf', build_id + '_talon.gtf')
-    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+=======
+        o1 = join(out_dir,'gtf', build_id + '_talon.gtf')
+    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+>>>>>>> b908b759e516b41e4e9a6fc5e1c803419d1ddb3b
     shell:
         '''
         talon_create_GTF \
