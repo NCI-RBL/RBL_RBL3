@@ -41,7 +41,7 @@ def talon_config(wildcards):
     for bc in bc_list:
         df_sub = df_sample[df_sample["filename"] == bc]
         
-        output_filename = join(out_dir,'labeled',bc + '_labeled.sam')
+        output_filename = join(out_dir,'04_sam_labeled',bc + '_labeled.sam')
         config_data.append(df_sub.iloc[0]['sampleid'] + "," + build_id + "," + sequence_id + "," + output_filename)
     
     #create config
@@ -178,7 +178,7 @@ rule talon_prime:
         script_dir = talon_dir,
         anno = anno_fa,
         base_tmp = join(out_dir,'tmp' + '_' + '{bc}'),
-        base_sample = join(out_dir,'04_sam_labeled','{bc}')
+        base_sample = join(out_dir,'04_sam_labeled','{bc}'),
     output:
         o1 = join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),
         o2 = join(out_dir,'04_sam_labeled','{bc}_read_labels.tsv'),
