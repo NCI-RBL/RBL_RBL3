@@ -3,13 +3,15 @@ title: "Transcript Types"
 output: html_document
 params:
   f_data: 
-    value: "example_talon_abundance_filtered.tsv"
+    value: "~/../../Volumes/data/rbl3/06_read_counts/SIRV_talon_abundance_filtered.tsv"
   u_data: 
-      value: "example_talon_abundance.tsv"
+    value: "~/../../Volumes/data/rbl3/06_read_counts/SIRV_talon_abundance.tsv"
+  output_dir:
+    value: "~/../../Volumes/data/rbl3/08_abundance_plots/"
   perc_sim:
-      value: x
+    value: 20
   num_math:
-      value: x
+    value: 5
 ---
 
 # Project Title
@@ -26,6 +28,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyverse)
 library(ggpubr)
+library(reshape2)
 
 #references
 #https://www.biorxiv.org/content/10.1101/672931v2.supplementary-material
@@ -34,11 +37,12 @@ library(ggpubr)
 ```{r Params, echo=FALSE}
 filtered_data = params$f_data
 unfiltered_data = params$u_data
+out_dir = params$output_dir
 ```
 
 ```{r, echo=FALSE}
 #plot transcript read lengths, read counts, exon counts
-TranscriptFeatures <- function(df_in,title_in) {
+TranscriptFeatures <- function(df_in,title_in,type_in) {
   abund_df = read.csv(df_in,sep="\t")
   
   p1 = ggplot(abund_df, aes(x=transcript_novelty, y=length, fill=transcript_novelty)) + 
@@ -46,23 +50,35 @@ TranscriptFeatures <- function(df_in,title_in) {
     geom_boxplot(width=0.1, fill="white")+
     labs(title="Plot of read length",
          x="Transcript type", y = "Read Length")+
-    scale_fill_brewer(palette="RdBu") + theme_minimal()
+    scale_fill_brewer(palette="Dark2") + theme_minimal()
   
   p2 = ggplot(abund_df, aes(x=transcript_novelty, y=n_exons, fill=transcript_novelty)) + 
     geom_violin(trim=FALSE)+
     geom_boxplot(width=0.1, fill="white")+
     labs(title="Plot of number of exons",
-         x="Transcript Type", y = "Number of Exons")+
-    scale_fill_brewer(palette="RdBu") + theme_minimal()
+         x="Transcript Type", y = "Number of Exons") +
+    scale_fill_brewer(palette="Dark2") + theme_minimal()
 
-  transcript_nov = aggregate(SIRV_Rep1~transcript_novelty,abund_df,sum)
-  transcript_nov$SIRV_Rep2 = aggregate(SIRV_Rep2~transcript_novelty,abund_df,sum)$SIRV_Rep2
+  #aggregate by type
+  transcript_nov = aggregate(get(colnames(abund_df[12]))~transcript_novelty,abund_df,sum)
+  colnames(transcript_nov)[2] <- colnames(abund_df[12])
   
-  p3 = ggplot(data = transcript_nov %>% gather(Variable, SIRV_Rep1, -transcript_novelty), 
-         aes(x = transcript_novelty, y = SIRV_Rep1, fill = Variable)) + 
-      geom_bar(stat = 'identity', position = 'dodge') + 
-    labs(y="Read Counts") + 
-    ggtitle("Plot of read counts")
+  for (i in range(13:ncol(abund_df))){
+    transcript_nov[,colnames(abund_df[i])] = aggregate(get(colnames(abund_df[i]))
+                                                           ~transcript_novelty,abund_df,sum)[2]
+    
+  }                      
+  
+  #melt and plot
+  dfm <- melt(transcript_nov[,c('transcript_novelty',
+                                colnames(abund_df)[12:ncol(abund_df)])],
+              id.vars = 1)
+
+  p3 = ggplot(dfm,aes(x = transcript_novelty,y = value)) + 
+      geom_bar(aes(fill = variable),stat = "identity",position = "dodge") + 
+    labs(y="Read Counts", fill = "sample_id") + 
+    ggtitle("Plot of read counts") +
+    scale_fill_brewer(palette="Dark2") + theme_minimal()
 
   p4 = ggparagraph(
     paste0("\n\n\n",title_in),
@@ -74,9 +90,12 @@ TranscriptFeatures <- function(df_in,title_in) {
   )
   
   #plot
-  ggarrange(p1, p2, p3, p4,
+  p_final = ggarrange(p1, p2, p3, p4,
             labels = c("A", "B", "C"),
             ncol = 2, nrow = 2)
+  
+  #save plot
+  ggsave(paste0(out_dir,type_in,".png"),p_final)
 } 
 ```
 
@@ -87,7 +106,7 @@ TranscriptFeatures <- function(df_in,title_in) {
 * NNC: novel not in catalog
 ```{r}
 #plot unfiltered
-TranscriptFeatures(unfiltered_data,"    Unfiltered Data")
+TranscriptFeatures(unfiltered_data,"    Unfiltered Data","_unfiltered")
 ```
 
 **Transcripts are then filtered based on the following criteria**
@@ -95,5 +114,5 @@ A) transcripts are known OR
 B) reads must have < param$perc_sim A in the 20bp interval after alignment AND 
 be detected at least param$num_match times in both replicates
 ```{r}
-TranscriptFeatures(filtered_data,"     Filtered Data")```
+TranscriptFeatures(filtered_data,"     Filtered Data","_filtered")
 ```
