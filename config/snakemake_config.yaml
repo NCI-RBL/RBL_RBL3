@@ -24,7 +24,7 @@ primer_length: "20" #match the length of the T sequence in your primer, default 
 #ref files
 annotation_gtf: "/data/CCBR_Pipeliner/db/PipeDB/Indices/GTFs/hg38/gencode.v30.annotation.gtf"
 annotation_fa: "/data/CCBR_Pipeliner/db/PipeDB/Indices/hg38_30/ref.fa"
-annotation_gff: "/data/CCBR/projects/rbl3/Homo_sapiens_GRCh38_Ensembl_86.gff3"
+annotation_gff: "/data/CCBR/projects/rbl3/dependencies/Homo_sapiens_GRCh38_Ensembl_86.gff3"
 
 #modules, container parameters
 conda_dir: "/data/CCBR/projects/rbl3/dependencies/conda_envs/"
