@@ -63,16 +63,18 @@ rule all:
         expand(join(out_dir,'sam','{bc}_sorted.sam'),bc=bc_list),
 
         #talon
-        join(out_dir,'talon', 'talon_config.csv'),
-        join(out_dir,'talon', build_id + '.db'),
-        expand(join(out_dir,'labeled','{bc}_labeled.sam'),bc=bc_list),
-        join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
+        #join(out_dir,'talon', 'talon_config.csv'),
+        #join(out_dir,'talon', build_id + '.db'),
+        #expand(join(out_dir,'labeled','{bc}_labeled.sam'),bc=bc_list),
+        #join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
         join(out_dir,'talon', build_id + '_talon_summary.tsv'),
-        join(out_dir,'counts', build_id + '_talon_abundance.txt'),
+        join(out_dir,'counts', build_id + '_talon_abundance.tsv'),
         join(out_dir,'counts', build_id + '_whitelist.txt'),
-        join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt'),
-        join(out_dir,'gtf', build_id + '_talon.gtf')
+        join(out_dir,'counts', build_id + '_talon_abundance_filtered.tsv'),
+        join(out_dir,'gtf', build_id + '_talon.gtf'),
 
+        #squanti
+        join(out_dir,'tbd')
 
         #collapsed files
         #expand(join(out_dir,'collapsed','{bc}.collapsed.gff'),bc=bc_list),
@@ -252,7 +254,7 @@ rule talon_counts:
         b_id = build_id,
         base = join(out_dir,'counts', build_id)
     output:
-        o1 = join(out_dir,'counts', build_id + '_talon_abundance.txt')
+        o1 = join(out_dir,'counts', build_id + '_talon_abundance.tsv')
     container: "docker://nciccbr/ccbr_talon_v5.0:latest"
     shell:
         '''
@@ -301,7 +303,7 @@ rule talon_abundance_filtered:
         b_id = build_id,
         base = join(out_dir,'counts', build_id)
     output:
-        o1 = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
+        o1 = join(out_dir,'counts', build_id + '_talon_abundance_filtered.tsv')
     container: "docker://nciccbr/ccbr_talon_v5.0:latest"
     shell:
         '''
@@ -369,38 +371,37 @@ rule talon_gtf:
 #             -o {params.bc}
 #         '''
 
-# rule squanti:
-#     '''
-#     remove params: 
-#     --polyA_motif_list  polyA.list
+rule squanti:
+    '''
+    remove params: 
+    --polyA_motif_list  polyA.list
+    --cage_peak {params.cage} \
 
-#     for short read data only:
-#     --expression rsemQuantification.chr13.isoforms.results
-#     -c star.SJ.out.tab \
+    for short read data only:
+    --expression rsemQuantification.chr13.isoforms.results
+    -c star.SJ.out.tab \
 
-#     #sqanti3_qc.py and sqanti3_RulesFilter.py work directly without the python prefix ... 
-#     '''
-#     input:
-#         gtf = join(out_dir,'gtf', build_id + '_talon.gtf'),
-#         counts = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
-#     params:
-#         rname = "11_sqanti",
-#         gtf = anno_gtf,
-#         fa = anno_fa,
-#         cage = CAGE,
-#         gff = anno_gff,
-#     container: "docker://nciccbr/ccbr_sqanti_3:latest"
-#     output:
-#         o1 = join(out_dir,'tbd')
-#     shell:
-#         '''
-#         sqanti3_qc.py \
-#             --gtf {input.gtf} {params.gtf} {params.fa} \
-#             --cage_peak {params.cage} \
-#             --fl_count {input.counts} \
-#             --isoAnnotLite \
-#             --gff3 {params.gff}
-#         '''
+    #sqanti3_qc.py and sqanti3_RulesFilter.py work directly without the python prefix ... 
+    '''
+    input:
+        gtf = join(out_dir,'gtf', build_id + '_talon.gtf'),
+        counts = join(out_dir,'counts', build_id + '_talon_abundance_filtered.tsv')
+    params:
+        rname = "11_sqanti",
+        gtf = anno_gtf,
+        fa = anno_fa,
+        gff = anno_gff,
+    container: "docker://nciccbr/ccbr_sqanti_3:latest"
+    output:
+        o1 = join(out_dir,'tbd')
+    shell:
+        '''
+        sqanti3_qc.py \
+            --gtf {input.gtf} {params.gtf} {params.fa} \
+            --fl_count {input.counts} \
+            --isoAnnotLite \
+            --gff3 {params.gff}
+        '''
 
 # '''
 # rule :
