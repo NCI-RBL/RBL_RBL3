@@ -75,10 +75,6 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
 
   #submit jobs locally
   else
-    #remove iCount dir if it already exist - will cause error in demux
-    if [ -d "/tmp/iCount" ]; then 
-      rm -r /tmp/iCount/ 
-    fi
     snakemake \
       -s workflow/Snakefile \
       --use-envmodules \
