@@ -3,16 +3,14 @@ import pandas as pd
 from collections import defaultdict
 import yaml
 
-#snakemake config
+#config dir
 source_dir = config['source_dir']
 out_dir = config['output_dir'].rstrip('/') + '/'
 fastq_dir = config['fastq_dir'].rstrip('/') + '/'
 talon_dir = config['talon_dir'].rstrip('/') + '/'
-#cupcake_dir = config['cupcake'].rstrip('/') + '/'
 sample_manifest=config['sample_manifest']
-#sqanti_yaml=config['sqanti_yaml']
 
-#user params
+#config user params
 annotation_id=config['annotation_id']
 build_id=config['build_id']
 maxFracA=config['maxFracA']
