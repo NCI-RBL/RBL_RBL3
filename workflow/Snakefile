@@ -7,10 +7,10 @@ import yaml
 source_dir = config['source_dir']
 out_dir = config['output_dir'].rstrip('/') + '/'
 fastq_dir = config['fastq_dir'].rstrip('/') + '/'
-talon_dir = config['talon'].rstrip('/') + '/'
-cupcake_dir = config['cupcake'].rstrip('/') + '/'
+talon_dir = config['talon_dir'].rstrip('/') + '/'
+#cupcake_dir = config['cupcake'].rstrip('/') + '/'
 sample_manifest=config['sample_manifest']
-sqanti_yaml=config['sqanti_yaml']
+#sqanti_yaml=config['sqanti_yaml']
 
 #user params
 annotation_id=config['annotation_id']
@@ -24,7 +24,7 @@ sequence_id=config['sequence_id']
 #ref information
 anno_gtf=config['annotation_gtf']
 anno_fa=config['annotation_fa']
-# anno_gff=config['annotation_gff']
+anno_gff=config['annotation_gff']
 
 #barcode list
 df_sample = pd.read_csv(sample_manifest,sep="\t")
@@ -200,22 +200,23 @@ rule talon_annotation:
         rname = "05_talon_anno",
         script_dir = talon_dir,
         b_id = build_id,
-        base = join(out_dir,'talon',build_id)
-    envmodules:
-        config['bedtools']
+        base_tmp = join(out_dir,'tmp_annotations'),
+        base_sample = join(out_dir,'talon',build_id)
     output:
         o1 = join(out_dir,'talon', build_id + '_talon_read_annot.tsv'),
         o2 = join(out_dir,'talon', build_id + '_QC.log'),
-    container: "docker://nciccbr/ccbr_talon_v5.0:latest"
+    envmodules:
+        config['python'],
     shell:
         '''
         rm -rf talon_tmp; 
+        pip install {params.script_dir};
         talon \
             --f {input.t_config} \
             --db {input.db} \
             --build {params.b_id} \
             --t 5 \
-            --o {params.base}
+            --o {params.base_sample}
         '''
 
 rule talon_summary:
@@ -338,72 +339,68 @@ rule talon_gtf:
             --o {params.base}
         '''
 
-rule collapse:
-    '''
-    # cupcake tutorial
-    #https://github.com/Magdoll/cDNA_Cupcake/wiki/Cupcake:-supporting-scripts-for-Iso-Seq-after-clustering-step
-    '''
-    input:
-        f1 = join(out_dir,'fastq','{bc}.R1.fastq.gz'),
-        sam = join(out_dir,'sam','{bc}_sorted.sam')
-    params:
-        rname = "create_sam",
-        bc = '{bc}',
-        script_dir = cupcake_dir,
-        py = join(source_dir,'dependencies/cDNA_Cupcake/cupcake/tofu/','collapse_isoforms_by_sam.py')
-    envmodules:
-        config['python'],
-    output:
-        o1 = join(out_dir,'collapsed','{bc}.collapsed.gff'),
-        o2 = join(out_dir,'collapsed','{bc}.collapsed.rep.fq'),
-        o3 = join(out_dir,'collapsed','{bc}.collapsed.group.txt'),
-        o4 = join(out_dir,'collapsed','{bc}.ignored_ids.txt'),
-    shell:
-        '''
-        python {params.py} \
-            --input {input.f1} \
-            --fq \
-            -s {input.sam} \
-            --dun-merge-5-shorter \
-            -o {params.bc}
-        '''
+# rule collapse:
+#     '''
+#     # cupcake tutorial
+#     #https://github.com/Magdoll/cDNA_Cupcake/wiki/Cupcake:-supporting-scripts-for-Iso-Seq-after-clustering-step
+#     '''
+#     input:
+#         f1 = join(out_dir,'fastq','{bc}.R1.fastq.gz'),
+#         sam = join(out_dir,'sam','{bc}_sorted.sam')
+#     params:
+#         rname = "create_sam",
+#         bc = '{bc}',
+#         script_dir = cupcake_dir,
+#         py = join(source_dir,'dependencies/cDNA_Cupcake/cupcake/tofu/','collapse_isoforms_by_sam.py')
+#     envmodules:
+#         config['python'],
+#     output:
+#         o1 = join(out_dir,'collapsed','{bc}.collapsed.gff'),
+#         o2 = join(out_dir,'collapsed','{bc}.collapsed.rep.fq'),
+#         o3 = join(out_dir,'collapsed','{bc}.collapsed.group.txt'),
+#         o4 = join(out_dir,'collapsed','{bc}.ignored_ids.txt'),
+#     shell:
+#         '''
+#         python {params.py} \
+#             --input {input.f1} \
+#             --fq \
+#             -s {input.sam} \
+#             --dun-merge-5-shorter \
+#             -o {params.bc}
+#         '''
 
-rule squanti:
-    '''
-    remove params: 
-    --polyA_motif_list  polyA.list
+# rule squanti:
+#     '''
+#     remove params: 
+#     --polyA_motif_list  polyA.list
 
-    for short read data only:
-    --expression rsemQuantification.chr13.isoforms.results
-    -c star.SJ.out.tab \
+#     for short read data only:
+#     --expression rsemQuantification.chr13.isoforms.results
+#     -c star.SJ.out.tab \
 
-    '''
-    input:
-        gtf = join(out_dir,'gtf', build_id + '_talon.gtf'),
-        counts = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
-    params:
-        rname = "11_sqanti",
-        gtf = anno_gtf,
-        fa = anno_fa,
-        cage = CAGE,
-        gff = anno_gff,
-    container: "docker://nciccbr/ccbr_sqanti_3:latest"
-    output:
-        o1 = join(out_dir,'tbd')
-    shell:
-        '''
-        sqanti3_qc.py \
-            --gtf {input.gtf} {params.gtf} {params.fa} \
-            --cage_peak {params.cage} \
-            --fl_count {input.counts} \
-            --isoAnnotLite \
-            --gff3 {params.gff}
-        '''
-
-
-#sqanti3_qc.py and sqanti3_RulesFilter.py work directly without the python prefix ... 
-#I have made them executable inside the docker ... let me know if it works
-
+#     #sqanti3_qc.py and sqanti3_RulesFilter.py work directly without the python prefix ... 
+#     '''
+#     input:
+#         gtf = join(out_dir,'gtf', build_id + '_talon.gtf'),
+#         counts = join(out_dir,'counts', build_id + '_talon_abundance_filtered.txt')
+#     params:
+#         rname = "11_sqanti",
+#         gtf = anno_gtf,
+#         fa = anno_fa,
+#         cage = CAGE,
+#         gff = anno_gff,
+#     container: "docker://nciccbr/ccbr_sqanti_3:latest"
+#     output:
+#         o1 = join(out_dir,'tbd')
+#     shell:
+#         '''
+#         sqanti3_qc.py \
+#             --gtf {input.gtf} {params.gtf} {params.fa} \
+#             --cage_peak {params.cage} \
+#             --fl_count {input.counts} \
+#             --isoAnnotLite \
+#             --gff3 {params.gff}
+#         '''
 
 # '''
 # rule :
