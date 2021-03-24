@@ -18,6 +18,8 @@ minCount=config['minCount']
 minDatasets=config['minDatasets']
 sequence_id=config['sequence_id']
 primer_len=config['primer_length']
+perc_sim = config['percent_similarity']
+num_match = config['number_of_matches']
 
 #ref information
 anno_gtf=config['annotation_gtf']
@@ -72,7 +74,10 @@ rule all:
         join(out_dir,'07_gtf', build_id + '_talon.gtf'),
 
         #squanti
-        join(out_dir,'tbd')
+        join(out_dir,'tbd'),
+
+        #qc
+        join(out_dir,'00_abundance_plots','abundance_plots.html')
 
         #collapsed files
         #expand(join(out_dir,'collapsed','{bc}.collapsed.gff'),bc=bc_list),
@@ -210,8 +215,6 @@ rule talon_annotation:
     output:
         o1 = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
         o2 = join(out_dir,'05_annotation', build_id + '_QC.log'),
-    envmodules:
-        config['python'],
     container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
     shell:
         '''
@@ -219,8 +222,8 @@ rule talon_annotation:
             --f {input.t_config} \
             --db {input.db} \
             --build {params.b_id} \
-            --t 5 \
-            --tmpDir = {params.base_tmp}
+            --threads 5 \
+            --tmpDir {params.base_tmp}
             --o {params.base_sample}
         '''
 
@@ -342,6 +345,32 @@ rule talon_gtf:
             -a {params.a_id} \
             --build {params.b_id} \
             --o {params.base}
+        '''
+
+rule abundance_plots:
+    input:
+        unfilt = join(out_dir,'06_read_counts', build_id + '_talon_abundance.tsv'),
+        filt = join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv')
+    params:
+        rname = "08_abundance_plots",
+        R = join(source_dir,"workflow","scripts","RBL3.Rmd"),
+        base = join(out_dir,'00_abundance_plots'),
+        perc_sim = perc_sim,
+        num_match = num_match
+    envmodules:
+        config['R'],
+    output:
+        o1 = join(out_dir,'00_abundance_plots','abundance_plots.html')
+    shell:
+        '''
+        Rscript -e 'library(rmarkdown); \
+        rmarkdown::render("{params.R}",
+            output_file = "{output.o1}", \
+            params= list(f_data = "{input.filt}", \
+                u_data = "{input.unfilt}", \
+                output_dir = "{params.base}", \
+                perc_sim = "{params.perc_sim}", \
+                num_match = "{params.num_match}"))'
         '''
 
 # rule collapse:
