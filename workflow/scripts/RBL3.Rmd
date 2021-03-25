@@ -10,7 +10,7 @@ params:
     value: "~/../../Volumes/data/rbl3/08_abundance_plots/"
   perc_sim:
     value: 20
-  num_math:
+  num_match:
     value: 5
 ---
 
@@ -95,7 +95,7 @@ TranscriptFeatures <- function(df_in,title_in,type_in) {
             ncol = 2, nrow = 2)
   
   #save plot
-  ggsave(paste0(out_dir,type_in,".png"),p_final)
+  ggsave(paste0(out_dir,"/",type_in,".png"),p_final)
 } 
 ```
 
@@ -106,7 +106,7 @@ TranscriptFeatures <- function(df_in,title_in,type_in) {
 * NNC: novel not in catalog
 ```{r}
 #plot unfiltered
-TranscriptFeatures(unfiltered_data,"    Unfiltered Data","_unfiltered")
+TranscriptFeatures(unfiltered_data,"    Unfiltered Data","unfiltered_abundance")
 ```
 
 **Transcripts are then filtered based on the following criteria**
@@ -114,5 +114,5 @@ A) transcripts are known OR
 B) reads must have < param$perc_sim A in the 20bp interval after alignment AND 
 be detected at least param$num_match times in both replicates
 ```{r}
-TranscriptFeatures(filtered_data,"     Filtered Data","_filtered")
+TranscriptFeatures(filtered_data,"     Filtered Data","filtered_abundance")
 ```
