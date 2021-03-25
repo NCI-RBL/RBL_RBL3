@@ -138,3 +138,7 @@ talon_tmp/
 *.DS_Store
 *.Rproj*
 *.snakemake/
+.Rproj.user
+kopardevn_dir_bash_history
+workflow/scripts/.Rhistory
+workflow/scripts/._RBL3.Rmd
