@@ -210,7 +210,7 @@ rule talon_annotation:
         rname = "05_annotate",
         script_dir = talon_dir,
         b_id = build_id,
-        base_tmp = join(out_dir,'tmp_annotations'),
+        base_tmp = join(out_dir,'tmp_annotations/'),
         base_sample = join(out_dir,'05_annotation',build_id)
     output:
         o1 = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
@@ -223,7 +223,7 @@ rule talon_annotation:
             --db {input.db} \
             --build {params.b_id} \
             --threads 5 \
-            --tmpDir {params.base_tmp}
+            --tmp_dir {params.base_tmp} \
             --o {params.base_sample}
         '''
 
@@ -333,7 +333,7 @@ rule talon_gtf:
         script_dir = talon_dir,
         a_id = annotation_id,
         b_id = build_id,
-        base = join(out_dir,'gtf', build_id)
+        base = join(out_dir,'07_gtf', build_id)
     output:
         o1 = join(out_dir,'07_gtf', build_id + '_talon.gtf')
     container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
