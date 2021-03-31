@@ -62,22 +62,30 @@ rule all:
         expand(join(out_dir,'02_sam','{bc}.sam'),bc=bc_list),
         expand(join(out_dir,'02_sam','{bc}_sorted.sam'),bc=bc_list),
 
-        #talon
-        join(out_dir,'03_talon', 'talon_config.csv'),
-        join(out_dir,'03_talon', build_id + '.db'),
-        expand(join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),bc=bc_list),
-        join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
-        join(out_dir,'06_read_counts', build_id + '_talon_summary.tsv'),
-        join(out_dir,'06_read_counts', build_id + '_talon_abundance.tsv'),
-        join(out_dir,'06_read_counts', build_id + '_whitelist.txt'),
-        join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv'),
-        join(out_dir,'07_gtf', build_id + '_talon.gtf'),
-
-        #squanti
-        join(out_dir,'tbd'),
+        #bam files
+        expand(join(out_dir,'03_bam','{bc}.bam'),bc=bc_list),
 
         #qc
-        join(out_dir,'00_abundance_plots','abundance_plots.html')
+        expand(join(out_dir, '00_qc','fastqc','{bc}_fastqc.html'),bc=bc_list)
+        #join(out_dir,'00_qc','multiqc_report.html'),
+        #join(out_dir,'00_qc','qc_report.html'),
+
+        # #talon
+        # join(out_dir,'03_talon', 'talon_config.csv'),
+        # join(out_dir,'03_talon', build_id + '.db'),
+        # expand(join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),bc=bc_list),
+        # join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
+        # join(out_dir,'06_read_counts', build_id + '_talon_summary.tsv'),
+        # join(out_dir,'06_read_counts', build_id + '_talon_abundance.tsv'),
+        # join(out_dir,'06_read_counts', build_id + '_whitelist.txt'),
+        # join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv'),
+        # join(out_dir,'07_gtf', build_id + '_talon.gtf'),
+
+        #squanti
+        #join(out_dir,'tbd'),
+
+        #qc
+        # join(out_dir,'00_abundance_plots','abundance_plots.html')
 
         #collapsed files
         #expand(join(out_dir,'collapsed','{bc}.collapsed.gff'),bc=bc_list),
@@ -93,19 +101,23 @@ rule handle_fastq:
         f1 = join(fastq_dir,'{bc}.fastq')
     params:
         rname = "01_fq",
-        base = join(out_dir,'01_fastq','{bc}.R1.fastq')
+        base = join(out_dir,'01_fastq','{bc}.R1.fastq'),
+        unzip = join(out_dir,'01_fastq','{bc}.R1.fastq'),
     output:
-        o1 = join(out_dir,'01_fastq','{bc}.R1.fastq.gz')
+        zip = join(out_dir,'01_fastq','{bc}.R1.fastq.gz')
     shell:
         '''
-        cp {input.f1} {output.o1}; \
-        gzip {output.o1}
+        cp {input.f1} {params.unzip}; \
+        gzip {params.unzip}
         '''
 
 rule create_sam:
     '''
     # cupcake tutorial
     #https://github.com/Magdoll/cDNA_Cupcake/wiki/Cupcake:-supporting-scripts-for-Iso-Seq-after-clustering-step
+
+    minimap flags
+    https://lh3.github.io/minimap2/minimap2.html
     '''
     input:
         f1 = join(out_dir,'01_fastq','{bc}.R1.fastq.gz')
@@ -114,17 +126,178 @@ rule create_sam:
         fa = anno_fa
     envmodules:
         config['minimap2'],
+        config['samtools']
     output:
         sam = join(out_dir,'02_sam','{bc}.sam'),
-        sam_sort = join(out_dir,'02_sam','{bc}_sorted.sam')
+        sorted = join(out_dir,'02_sam','{bc}_sorted.sam')
     shell:
         '''
         minimap2 \
             -ax splice -t 30 -uf --secondary=no -C5 --MD \
             {params.fa} {input.f1} > {output.sam};
-        sort -k 3,3 -k 4,4n {output.sam} > {output.sam_sort}
+        samtools sort {output.sam} -o [output.sorted]
         '''
 
+rule create_bam:
+    input:
+        f1 = join(out_dir,'02_sam','{bc}_sorted.sam')
+    params:
+        rname='03_bam'
+    envmodules:
+        config['samtools']
+    output:
+        bam = join(out_dir,'03_bam','{bc}.bam'),
+        sorted = join(out_dir, '03_bam','{bc}_sorted.bam')
+    shell:
+        """
+        samtools view -bS {input.f1} -o {output.bam}; \
+        samtools sort {output.bam} -o {output.sorted}; \
+        samtools index {output.sorted}; 
+        """
+
+rule qc_fastq:
+    """
+    Runs FastQC report on each sample 
+    """
+    input:
+        f1 = join(out_dir,'01_fastq','{bc}.R1.fastq.gz')
+    params:
+        rname='03_fqc',
+        base = join(out_dir, '00_qc','fastqc'),
+    envmodules:
+        config['fastqc']
+    output:
+        o1 = join(out_dir, '00_qc','fastqc','{bc}_fastqc.html')
+    shell:
+        """
+        fastqc {input.f1} -o {params.base}
+        """
+
+rule qc_screen_sp:
+    """
+    this will align to human, mouse, bacteria
+    must run fastq_screen as two separate rules - multiqc will merge values of rRNA with human/mouse
+    http://www.bioinformatics.babraham.ac.uk/projects/fastq_screen/_build/html/index.html
+    """
+    input:
+        f1 = join(out_dir,'01_fastq','{bc}.R1.fastq.gz')
+    params:
+        rname='03_screen',
+        base = join(out_dir, '00_qc', 'screen'),
+        fq_config = join(source_dir,'config','fqscreen_species_config.conf'),
+    threads: 24
+    envmodules:
+        config['bowtie2'],
+        config['perl'],
+        config['fastq_screen'],
+    output:
+        o1 = join(out_dir, '00_qc', 'screen','{bc}_screen.txt'),
+    shell:
+        '''
+        fastq_screen --conf {params.fq_config} --outdir {params.base} \
+            --threads {threads} --subset 1000000 --aligner bowtie2 --force \
+            {input.f1}
+        '''
+
+rule qc_samstats:
+    """
+    generate statistics for sam file before deduplication
+    http://www.htslib.org/doc/samtools-stats.html
+    > $1
+    """
+    input:
+        f1 = join(out_dir, '03_bam','{bc}.bam')
+    params:
+        rname='03_samstats'
+    envmodules:
+        config['samtools']
+    output:
+        o1 = join(out_dir, '00_qc','samtools','{bc}_samstats.txt')
+    shell:
+        """
+        samtools view -h {input.f1} | samtools stats - > {output.o1}
+        """
+
+rule qc_multiqc:
+    """
+    merges FastQC reports for pre/post trimmed fastq files into MultiQC report
+    https://multiqc.info/docs/#running-multiqc
+    """
+    input:
+        f1 = expand(join(out_dir, '00_qc','fastqc','{bc}_fastqc.html'),bc=bc_list),
+        f2 = expand(join(out_dir, '00_qc', 'screen','{bc}_screen.txt'),bc=bc_list),
+        f3 = expand(join(out_dir, '00_qc','samtools','{bc}_samstats.txt'),bc=bc_list)
+    params:
+        rname = '03_multiqc',
+        out = join(out_dir,'00_qc'),
+        qc_config = join(source_dir,'config','multiqc_config.yaml'),
+        dir_fastq = expand(join(out_dir, '00_qc', 'fastqc')),
+        dir_screen_species = expand(join(out_dir, '00_qc', 'screen')),
+    envmodules:
+        config['multiqc']
+    output:
+        o1 = join(out_dir,'00_qc','multiqc_report.html')
+    shell:
+        """
+        multiqc -f -v -c {params.qc_config} \
+            -d -dd 1 {params.dir_fastq} {params.dir_screen_species} \
+            -o {params.out}
+        """
+
+rule qc_alignment:
+    """
+    uses samtools to create a bams of unaligned reads and aligned reads
+    input; print qlength col to text file
+    generates plots and summmary file for aligned vs unaligned statistics
+    """
+    input:
+        f1 = join(out_dir, '03_bam','{bc}.bam')
+    params:
+        rname = "03_qc_align",
+        R = join(source_dir,'workflow','scripts','04_alignment_stats.R'),
+        base = join(out_dir, '00_qc', 'alignment')
+    envmodules:
+        config['samtools'],
+        config['R']
+    output:
+        bam_a = join(out_dir, '00_qc', 'alignment','{bc}_align_len.txt'),
+        bam_u = join(out_dir, '00_qc', 'alignment','{bc}_unalign_len.txt'),
+        png_align = join(out_dir, '00_qc', 'alignment','{bc}_aligned.png'),
+        png_unalign = join(out_dir, '00_qc', 'alignment','{bc}_unaligned.png'),
+        txt_align = join(out_dir, '00_qc', 'alignment','{bc}_aligned.txt'),
+        txt_unalign = join(out_dir, '00_qc', 'alignment','{bc}_unaligned.txt'),
+    shell:
+        """
+        samtools view -F 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_a}; \
+        samtools view -f 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_u}; \
+        Rscript {params.R} {wildcards.bc} {output.bam_a} {output.bam_u} {params.base}
+        """
+
+rule qc_troubleshoot:
+        """
+        generates a PDF of barcode plots and alignment plots for qc troubleshooting
+        """
+        input:
+            png_align = expand(join(out_dir, '00_qc', 'alignment','{bc}_aligned.png'), bc=bc_list),
+            png_unalign = expand(join(out_dir, '00_qc', 'alignment','{bc}_unaligned.png'), bc=bc_list),
+            txt_align = expand(join(out_dir, '00_qc', 'alignment','{bc}_aligned.txt'), bc=bc_list),
+            txt_unalign = expand(join(out_dir, '00_qc', 'alignment','{bc}_unaligned.txt'), bc=bc_list),
+        params:
+            rname = "03_qc_ts",
+            R = join(source_dir,'workflow','scripts','qc_report_nondemux.Rmd'),
+        envmodules:
+            config['R']
+        output:
+            o1 = join(out_dir,'00_qc','qc_report.html')
+        shell:
+            """
+            Rscript -e 'library(rmarkdown); \
+            rmarkdown::render("{params.R}",
+                output_file = "{output.o1}", \
+                params= list(a_txt = "{input.txt_align}", \
+                    u_txt = "{input.txt_unalign}"))'
+            """
+            
 rule talon_config:
     '''
     generate talon config
@@ -412,27 +585,25 @@ rule squanti:
     for short read data only:
     --expression rsemQuantification.chr13.isoforms.results
     -c star.SJ.out.tab \
+    
+    sqanti3_qc.py --gtf {input.gtf} {params.anno} --fl_count {input.counts} --isoAnnotLite --gff3 {params.gff}
 
-    #sqanti3_qc.py and sqanti3_RulesFilter.py work directly without the python prefix ... 
     '''
     input:
         gtf = join(out_dir,'07_gtf', build_id + '_talon.gtf'),
         counts = join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv')
     params:
         rname = "11_sqanti",
-        gtf = anno_gtf,
-        fa = anno_fa,
-        gff = anno_gff,
+        anno = anno_gtf + " " + anno_fa,
+        gff = anno_gff
     container: "docker://nciccbr/ccbr_sqanti_3:latest"
     output:
         o1 = join(out_dir,'tbd')
     shell:
         '''
-        sqanti3_qc.py \
-            --gtf {input.gtf} {params.gtf} {params.fa} \
-            --fl_count {input.counts} \
-            --isoAnnotLite \
-            --gff3 {params.gff}
+        sqanti3_qc.py --gtf /data/sevillas2/rbl3/07_gtf/SIRV_talon.gtf /data/CCBR_Pipeliner/db/PipeDB/Indices/GTFs/hg38/gencode.v30.annotation.gtf \
+            /data/CCBR_Pipeliner/db/PipeDB/Indices/hg38_30/ref.fa --fl_count /data/sevillas2/rbl3/06_read_counts/SIRV_talon_abundance_filtered.tsv \
+            --isoAnnotLite --gff3 /data/CCBR/projects/rbl3/dependencies/Homo_sapiens_GRCh38_Ensembl_86.gff3
         '''
 
 # '''
