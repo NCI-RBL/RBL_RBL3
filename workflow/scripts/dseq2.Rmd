@@ -1,0 +1,64 @@
+---
+title: "Paper"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+Differential expression analysis was performed with the DESeq2 package v.1.12.3 [23]. Genes were declared differentially expressed (DEGs) if their Benjamini-adjusted p-value was lower than 0.1. Only expressed genes (i.e. passing the independent filtering performed by DESeq2) were used for all following analyses.
+
+```{r}
+library("DESeq2")
+#tutorial https://tmogrady.github.io/bioconductor-2018-01-29-maxplanck/02-DESeq2/index.html
+input_dir = "~/../../Volumes/data/rbl3/06_read_counts"
+output_dir = "~/../../Volumes/data/rbl3/08_R"
+manifest_dir = "~/../../Volumes/data/rbl3/sample.tsv"
+  
+counts_anno = read.csv(paste0(input_dir,"/SIRV_talon_abundance_filtered.tsv"),sep="\t")
+head(counts_anno)
+
+counts_df = counts_anno[,c(3,12:ncol(counts_anno))]
+head(counts_df)
+
+#collapse dup gene id's
+counts_col = aggregate(.~ annot_gene_id, data=counts_df, FUN=sum)
+
+rownames(counts_col) = counts_col$annot_gene_id
+counts_col = subset(counts_col, select=-c(annot_gene_id))
+head(counts_col)
+
+#metadata
+metadata = read.csv(manifest_dir,sep="\t",row.names = 2)
+metadata$group = as.factor(metadata$group)
+head(metadata)
+
+#create deseq object
+dseq = DESeqDataSetFromMatrix(countData = counts_col,
+                              colData = metadata,
+                              design = ~ group)
+
+#filter genes for at least 10 reads
+keep <- rowSums(counts(dseq)) >= 10
+dds <- dseq[keep,]
+dds
+
+#set reference
+dds$group <- relevel(dds$group, ref = "wt")
+
+#run diff expression
+dds <- DESeq(dds)
+res <- results(dds)
+
+#review summary
+summary(res)
+
+#plot normalized counts
+plotMA(res, ylim=c(-2,2))
+
+#filter < 0.05
+res_sig = subset(res,pvalue < 0.05)
+
+#create sig annotation
+anno_sig = subset(counts_anno, annot_gene_id %in% rownames(res_sig))
+anno_sig[,c(3,5,6,7,8,9,12:ncol(anno_sig))]
+
+```
