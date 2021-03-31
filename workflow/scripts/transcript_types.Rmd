@@ -7,7 +7,7 @@ params:
   u_data: 
     value: "~/../../Volumes/data/rbl3/06_read_counts/SIRV_talon_abundance.tsv"
   output_dir:
-    value: "~/../../Volumes/data/rbl3/08_abundance_plots/"
+    value: "~/../../Volumes/data/rbl3/08_R"
   perc_sim:
     value: 20
   num_match:
@@ -50,14 +50,14 @@ TranscriptFeatures <- function(df_in,title_in,type_in) {
     geom_boxplot(width=0.1, fill="white")+
     labs(title="Plot of read length",
          x="Transcript type", y = "Read Length")+
-    scale_fill_brewer(palette="Dark2") + theme_minimal()
+    scale_fill_brewer(palette="Dark2") + theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
   p2 = ggplot(abund_df, aes(x=transcript_novelty, y=n_exons, fill=transcript_novelty)) + 
     geom_violin(trim=FALSE)+
     geom_boxplot(width=0.1, fill="white")+
     labs(title="Plot of number of exons",
          x="Transcript Type", y = "Number of Exons") +
-    scale_fill_brewer(palette="Dark2") + theme_minimal()
+    scale_fill_brewer(palette="Dark2") + theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
   #aggregate by type
   transcript_nov = aggregate(get(colnames(abund_df[12]))~transcript_novelty,abund_df,sum)
@@ -78,7 +78,7 @@ TranscriptFeatures <- function(df_in,title_in,type_in) {
       geom_bar(aes(fill = variable),stat = "identity",position = "dodge") + 
     labs(y="Read Counts", fill = "sample_id") + 
     ggtitle("Plot of read counts") +
-    scale_fill_brewer(palette="Dark2") + theme_minimal()
+    scale_fill_brewer(palette="Dark2") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
   p4 = ggparagraph(
     paste0("\n\n\n",title_in),
