@@ -93,6 +93,8 @@ TranscriptFeatures <- function(df_in,title_in,type_in) {
   p_final = ggarrange(p1, p2, p3, p4,
             labels = c("A", "B", "C"),
             ncol = 2, nrow = 2)
+    
+  print(p_final)
   
   #save plot
   ggsave(paste0(out_dir,"/",type_in,".png"),p_final)
