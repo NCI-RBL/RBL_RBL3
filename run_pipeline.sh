@@ -53,6 +53,15 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
     cp $f "${output_dir}/log/${log_time}_00_${strarr[-1]}"
   done
 
+  # copy workflow dir for archiving
+  if [ -d "${output_dir}/workflow" ]
+  then
+    echo "Using previously generated RBL3 pipeline"
+  else
+    mkdir "${output_dir}/workflow"
+    cp -r "${source_dir}/workflow/" "${output_dir}/"
+  fi
+
   #submit jobs to cluster
   if [[ $pipeline = "cluster" ]]; then
     sbatch --job-name="RBL3" --gres=lscratch:200 --time=120:00:00 --output=${output_dir}/log/${log_time}_00_%j_%x.out --mail-type=BEGIN,END,FAIL \
@@ -60,7 +69,7 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
     --use-envmodules \
     --rerun-incomplete \
     --latency-wait 120 \
-    -s workflow/Snakefile \
+    -s ${output_dir}/workflow/Snakefile \
     --configfile ${output_dir}/log/${log_time}_00_snakemake_config.yaml \
     --printshellcmds \
     --cluster-config ${output_dir}/log/${log_time}_00_cluster_config.yml \
@@ -76,7 +85,7 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
   #submit jobs locally
   else
     snakemake \
-      -s workflow/Snakefile \
+      -s ${output_dir}/workflow/Snakefile \
       --use-envmodules \
       --configfile ${output_dir}/log/${log_time}_00_snakemake_config.yaml \
       --printshellcmds \
