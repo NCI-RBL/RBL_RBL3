@@ -519,36 +519,6 @@ rule abundance_plots:
                 num_match = "{params.num_match}"))'
         '''
 
-# rule collapse:
-#     '''
-#     # cupcake tutorial
-#     #https://github.com/Magdoll/cDNA_Cupcake/wiki/Cupcake:-supporting-scripts-for-Iso-Seq-after-clustering-step
-#     '''
-#     input:
-#         f1 = join(out_dir,'fastq','{bc}.R1.fastq.gz'),
-#         sam = join(out_dir,'sam','{bc}_sorted.sam')
-#     params:
-#         rname = "create_sam",
-#         bc = '{bc}',
-#         script_dir = cupcake_dir,
-#         py = join(source_dir,'dependencies/cDNA_Cupcake/cupcake/tofu/','collapse_isoforms_by_sam.py')
-#     envmodules:
-#         config['python'],
-#     output:
-#         o1 = join(out_dir,'collapsed','{bc}.collapsed.gff'),
-#         o2 = join(out_dir,'collapsed','{bc}.collapsed.rep.fq'),
-#         o3 = join(out_dir,'collapsed','{bc}.collapsed.group.txt'),
-#         o4 = join(out_dir,'collapsed','{bc}.ignored_ids.txt'),
-#     shell:
-#         '''
-#         python {params.py} \
-#             --input {input.f1} \
-#             --fq \
-#             -s {input.sam} \
-#             --dun-merge-5-shorter \
-#             -o {params.bc}
-#         '''
-
 rule squanti:
     '''
     remove params: 
