@@ -29,6 +29,9 @@ s_time=`date +"%Y%m%d_%H%M%S"`
 
 #clean config_output_dir
 output_dir=${config_output_dir}
+source_dir=$(echo $config_source_dir | sed 's:/*$::')
+
+#singularity params
 SINGULARITY_BINDS="$SINGULARITY_BINDS -B $output_dir:$output_dir"
 
 #Run pipeline on cluster or locally
