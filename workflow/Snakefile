@@ -7,7 +7,7 @@ import yaml
 source_dir = config['source_dir']
 out_dir = config['output_dir'].rstrip('/') + '/'
 fastq_dir = config['fastq_dir'].rstrip('/') + '/'
-talon_dir = config['talon_dir'].rstrip('/') + '/'
+talon_conda = config['talon_conda']
 sample_manifest=config['sample_manifest']
 
 #config user params
@@ -291,13 +291,13 @@ rule talon_db:
         anno = anno_gtf,
     params:
         rname = "03_talon_db",
-        script_dir = talon_dir,
         a_id = annotation_id,
         b_id = build_id,
         base = join(out_dir,'03_talon',build_id)
     output:
         o1 = join(out_dir,'03_talon',build_id + '.db')
-    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+    container: 
+        talon_conda
     shell:
         '''
         talon_initialize_database \
@@ -324,7 +324,6 @@ rule talon_prime:
         f1 = join(out_dir,'02_sam','{bc}.sam'),
     params:
         rname = "04_label",
-        script_dir = talon_dir,
         anno = anno_fa,
         base_tmp = join(out_dir,'tmp' + '_' + '{bc}'),
         base_sample = join(out_dir,'04_sam_labeled','{bc}'),
@@ -332,7 +331,8 @@ rule talon_prime:
     output:
         o1 = join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),
         o2 = join(out_dir,'04_sam_labeled','{bc}_read_labels.tsv'),
-    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+    container: 
+        talon_conda
     shell:
         '''
         talon_label_reads --f {input.f1} \
@@ -354,14 +354,14 @@ rule talon_annotation:
         sam = expand(join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),bc=bc_list)
     params:
         rname = "05_annotate",
-        script_dir = talon_dir,
         b_id = build_id,
         base_tmp = join(out_dir,'tmp_annotations/'),
         base_sample = join(out_dir,'05_annotation',build_id)
     output:
         o1 = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
         o2 = join(out_dir,'05_annotation', build_id + '_QC.log'),
-    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+    container: 
+        talon_conda
     shell:
         '''
         talon \
@@ -382,11 +382,11 @@ rule talon_summary:
         anno = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
     params:
         rname = "06.1_summary",
-        script_dir = talon_dir,
         base = join(out_dir,'06_read_counts', build_id)
     output:
         o1 = join(out_dir,'06_read_counts', build_id + '_talon_summary.tsv')
-    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+    container: 
+        talon_conda
     shell:
         '''
         talon_summarize --db {input.db} --v --o {params.base}
@@ -401,13 +401,13 @@ rule talon_counts:
         anno = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
     params:
         rname = "06.2_abundance",
-        script_dir = talon_dir,
         a_id = annotation_id,
         b_id = build_id,
         base = join(out_dir,'06_read_counts', build_id)
     output:
         o1 = join(out_dir,'06_read_counts', build_id + '_talon_abundance.tsv')
-    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+    container: 
+        talon_conda
     shell:
         '''
         talon_abundance --db {input.db} -a {params.a_id} --build {params.b_id} --o {params.base}
@@ -422,14 +422,14 @@ rule talon_whitelist:
         anno = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
     params:
         rname = "06.3_whitelist",
-        script_dir = talon_dir,
         a_id = annotation_id,
         max_frac  = maxFracA,
         min_count = minCount,
         min_ds = minDatasets
     output:
         o1 = join(out_dir,'06_read_counts',build_id + '_whitelist.txt')
-    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+    container: 
+        talon_conda
     shell:
         '''
         talon_filter_transcripts \
@@ -450,13 +450,13 @@ rule talon_abundance_filtered:
         white_list = join(out_dir,'06_read_counts',build_id + '_whitelist.txt')
     params:
         rname = "06.4_abundance_filt",
-        script_dir = talon_dir,
         a_id = annotation_id,
         b_id = build_id,
         base = join(out_dir,'06_read_counts', build_id)
     output:
         o1 = join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv')
-    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+    container: 
+        talon_conda
     shell:
         '''
         talon_abundance \
@@ -476,13 +476,13 @@ rule talon_gtf:
         w_list = join(out_dir,'06_read_counts',build_id + '_whitelist.txt')
     params:
         rname = "07_gtf",
-        script_dir = talon_dir,
         a_id = annotation_id,
         b_id = build_id,
         base = join(out_dir,'07_gtf', build_id)
     output:
         o1 = join(out_dir,'07_gtf', build_id + '_talon.gtf')
-    container: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+    container: 
+        talon_conda
     shell:
         '''
         talon_create_GTF \
