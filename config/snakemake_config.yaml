@@ -15,7 +15,7 @@ fastq_dir: "/data/RBL_NCI/Gu/chunmei/nanopore_rawfastqs/"
 #user parameters
 annotation_id: "SIRV_annot"
 build_id: "SIRV"
-sequence_id: "Illumina"
+platform_id: "Illumina"
 maxFracA: "0.5"
 minCount: "5"
 minDatasets: "2"
