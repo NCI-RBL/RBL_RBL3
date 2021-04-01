@@ -59,33 +59,34 @@ rule all:
         expand(join(out_dir,'01_fastq','{bc}.R1.fastq.gz'),bc=bc_list),
 
         #sam files
-        expand(join(out_dir,'02_sam','{bc}.sam'),bc=bc_list),
         expand(join(out_dir,'02_sam','{bc}_sorted.sam'),bc=bc_list),
 
         #bam files
         expand(join(out_dir,'03_bam','{bc}.bam'),bc=bc_list),
 
         #qc
-        expand(join(out_dir, '00_qc','fastqc','{bc}_fastqc.html'),bc=bc_list)
-        #join(out_dir,'00_qc','multiqc_report.html'),
-        #join(out_dir,'00_qc','qc_report.html'),
+        expand(join(out_dir, '00_qc','fastqc','{bc}.R1_fastqc.html'),bc=bc_list),
+        #expand(join(out_dir, '00_qc', 'screen','{bc}_screen.txt'),bc=bc_list),
+        expand(join(out_dir, '00_qc','samtools','{bc}_samstats.txt'),bc=bc_list),
+        join(out_dir,'00_qc','multiqc_report.html'),
+        join(out_dir,'00_qc','qc_report.html'),
 
-        # #talon
-        # join(out_dir,'03_talon', 'talon_config.csv'),
-        # join(out_dir,'03_talon', build_id + '.db'),
-        # expand(join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),bc=bc_list),
-        # join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
-        # join(out_dir,'06_read_counts', build_id + '_talon_summary.tsv'),
-        # join(out_dir,'06_read_counts', build_id + '_talon_abundance.tsv'),
-        # join(out_dir,'06_read_counts', build_id + '_whitelist.txt'),
-        # join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv'),
-        # join(out_dir,'07_gtf', build_id + '_talon.gtf'),
+        #talon
+        join(out_dir,'03_talon', 'talon_config.csv'),
+        join(out_dir,'03_talon', build_id + '.db'),
+        expand(join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),bc=bc_list),
+        join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
+        join(out_dir,'06_read_counts', build_id + '_talon_summary.tsv'),
+        join(out_dir,'06_read_counts', build_id + '_talon_abundance.tsv'),
+        join(out_dir,'06_read_counts', build_id + '_whitelist.txt'),
+        join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv'),
+        join(out_dir,'07_gtf', build_id + '_talon.gtf'),
 
         #squanti
         #join(out_dir,'tbd'),
 
         #qc
-        # join(out_dir,'00_abundance_plots','abundance_plots.html')
+        join(out_dir,'08_transcript_plots','abundance_plots.html')
 
         #collapsed files
         #expand(join(out_dir,'collapsed','{bc}.collapsed.gff'),bc=bc_list),
@@ -133,9 +134,9 @@ rule create_sam:
     shell:
         '''
         minimap2 \
-            -ax splice -t 30 -uf --secondary=no -C5 --MD \
+            -ax splice -t 30 --secondary=no --MD \
             {params.fa} {input.f1} > {output.sam};
-        samtools sort {output.sam} -o [output.sorted]
+        samtools sort {output.sam} -o {output.sorted}
         '''
 
 rule create_bam:
@@ -167,7 +168,7 @@ rule qc_fastq:
     envmodules:
         config['fastqc']
     output:
-        o1 = join(out_dir, '00_qc','fastqc','{bc}_fastqc.html')
+        o1 = join(out_dir, '00_qc','fastqc','{bc}.R1_fastqc.html')
     shell:
         """
         fastqc {input.f1} -o {params.base}
@@ -206,7 +207,7 @@ rule qc_samstats:
     > $1
     """
     input:
-        f1 = join(out_dir, '03_bam','{bc}.bam')
+        f1 = join(out_dir, '03_bam','{bc}_sorted.bam')
     params:
         rname='03_samstats'
     envmodules:
@@ -224,9 +225,9 @@ rule qc_multiqc:
     https://multiqc.info/docs/#running-multiqc
     """
     input:
-        f1 = expand(join(out_dir, '00_qc','fastqc','{bc}_fastqc.html'),bc=bc_list),
-        f2 = expand(join(out_dir, '00_qc', 'screen','{bc}_screen.txt'),bc=bc_list),
-        f3 = expand(join(out_dir, '00_qc','samtools','{bc}_samstats.txt'),bc=bc_list)
+        f1 = expand(join(out_dir, '00_qc', 'fastqc','{bc}.R1_fastqc.html'),bc=bc_list),
+        #f2 = expand(join(out_dir, '00_qc', 'screen','{bc}_screen.txt'),bc=bc_list),
+        f3 = expand(join(out_dir, '00_qc', 'samtools','{bc}_samstats.txt'),bc=bc_list)
     params:
         rname = '03_multiqc',
         out = join(out_dir,'00_qc'),
@@ -251,11 +252,11 @@ rule qc_alignment:
     generates plots and summmary file for aligned vs unaligned statistics
     """
     input:
-        f1 = join(out_dir, '03_bam','{bc}.bam')
+        f1 = join(out_dir, '03_bam','{bc}_sorted.bam')
     params:
         rname = "03_qc_align",
-        R = join(source_dir,'workflow','scripts','04_alignment_stats.R'),
-        base = join(out_dir, '00_qc', 'alignment')
+        R = join(source_dir,'workflow','scripts','alignment_stats.R'),
+        base = join(out_dir, '00_qc', 'alignment/')
     envmodules:
         config['samtools'],
         config['R']
@@ -526,14 +527,14 @@ rule abundance_plots:
         filt = join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv')
     params:
         rname = "08_abundance_plots",
-        R = join(source_dir,"workflow","scripts","RBL3.Rmd"),
-        base = join(out_dir,'00_abundance_plots'),
+        R = join(source_dir,"workflow","scripts","transcript_types.Rmd"),
+        base = join(out_dir,'08_transcript_plots'),
         perc_sim = perc_sim,
         num_match = num_match
     envmodules:
         config['R'],
     output:
-        o1 = join(out_dir,'00_abundance_plots','abundance_plots.html')
+        o1 = join(out_dir,'08_transcript_plots','abundance_plots.html')
     shell:
         '''
         Rscript -e 'library(rmarkdown); \
