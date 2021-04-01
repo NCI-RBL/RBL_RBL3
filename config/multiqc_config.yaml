@@ -10,13 +10,7 @@ fastqscreen_simpleplot: true
 #remove analysis paths from file
 show_analysis_paths: False
 
-#find samples
-sp:
-    fastq_screen:
-        fn: '*_screen.txt'
-
 module_order:
 # Pre-alignment QC
     - 'fastqc'
-    - 'fastq_screen'
     - 'samtools'

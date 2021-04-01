@@ -66,7 +66,6 @@ rule all:
 
         #qc
         expand(join(out_dir, '00_qc','fastqc','{bc}.R1_fastqc.html'),bc=bc_list),
-        #expand(join(out_dir, '00_qc', 'screen','{bc}_screen.txt'),bc=bc_list),
         expand(join(out_dir, '00_qc','samtools','{bc}_samstats.txt'),bc=bc_list),
         join(out_dir,'00_qc','multiqc_report.html'),
         join(out_dir,'00_qc','qc_report.html'),
@@ -174,32 +173,6 @@ rule qc_fastq:
         fastqc {input.f1} -o {params.base}
         """
 
-rule qc_screen_sp:
-    """
-    this will align to human, mouse, bacteria
-    must run fastq_screen as two separate rules - multiqc will merge values of rRNA with human/mouse
-    http://www.bioinformatics.babraham.ac.uk/projects/fastq_screen/_build/html/index.html
-    """
-    input:
-        f1 = join(out_dir,'01_fastq','{bc}.R1.fastq.gz')
-    params:
-        rname='03_screen',
-        base = join(out_dir, '00_qc', 'screen'),
-        fq_config = join(source_dir,'config','fqscreen_species_config.conf'),
-    threads: 24
-    envmodules:
-        config['bowtie2'],
-        config['perl'],
-        config['fastq_screen'],
-    output:
-        o1 = join(out_dir, '00_qc', 'screen','{bc}_screen.txt'),
-    shell:
-        '''
-        fastq_screen --conf {params.fq_config} --outdir {params.base} \
-            --threads {threads} --subset 1000000 --aligner bowtie2 --force \
-            {input.f1}
-        '''
-
 rule qc_samstats:
     """
     generate statistics for sam file before deduplication
@@ -226,8 +199,7 @@ rule qc_multiqc:
     """
     input:
         f1 = expand(join(out_dir, '00_qc', 'fastqc','{bc}.R1_fastqc.html'),bc=bc_list),
-        #f2 = expand(join(out_dir, '00_qc', 'screen','{bc}_screen.txt'),bc=bc_list),
-        f3 = expand(join(out_dir, '00_qc', 'samtools','{bc}_samstats.txt'),bc=bc_list)
+        f2 = expand(join(out_dir, '00_qc', 'samtools','{bc}_samstats.txt'),bc=bc_list)
     params:
         rname = '03_multiqc',
         out = join(out_dir,'00_qc'),
