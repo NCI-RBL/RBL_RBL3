@@ -3,10 +3,11 @@
 source_dir: "/data/CCBR/projects/rbl3/"
 
 #path to output directory
-output_dir: "/data/sevillas2/rbl3"
+output_dir: "/scratch/sevillas2/rbl3/flair"
 
 #path to manifest files
 sample_manifest: "/data/CCBR/projects/rbl3/manifest/sample.tsv"
+deg_manifest: "/data/CCBR/projects/rbl3/manifest/deg_manifest.txt"
 
 #path to fastq files
 #fastq_dir: "/data/RBL_NCI/Gu/chunmei/nanopore/fastq_pass"
@@ -33,10 +34,11 @@ conda_dir: "/data/CCBR/projects/rbl3/dependencies/conda_envs/"
 minimap2: "minimap2/2.17"
 python: "python/3.7"
 bedtools: "bedtools/2.29.2"
-talon_conda: "docker://nciccbr/ccbr_talon_v5.0:latest"
+#talon_conda: "docker://nciccbr/ccbr_talon_v5.0:2.0"
+talon_conda: "docker://nciccbr/ccbr_talon_5.0:latest"
 singularity: "singularity/3.7.0"
-#cupcake: "/data/CCBR/projects/rbl3/dependencies/cDNA_Cupcake"
-#sqanti_yaml:  "/data/CCBR/projects/rbl3/dependencies/conda_envs/SQANTI3/SQANTI3.conda_env.yml"
+porechop_conda: "/scratch/kopardevn/rbl3_test_out/porechop_0.2.4.sif"
+flair_conda: "/scratch/kopardevn/rbl3_test_out/ccbr_flair_v1.5.sif"
 
 bowtie2: "bowtie/2-2.3.4"
 fastq_screen: "fastq_screen/0.14.0"
