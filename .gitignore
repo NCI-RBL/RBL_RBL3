@@ -139,6 +139,8 @@ talon_tmp/
 *.Rproj*
 *.snakemake/
 .Rproj.user
-kopardevn_dir_bash_history
+kopardevn_dir_bash_history/
 workflow/scripts/.Rhistory
 workflow/scripts/._RBL3.Rmd
+*.v2*
+*.Rmd
