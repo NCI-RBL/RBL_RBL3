@@ -49,7 +49,7 @@ def talon_config(wildcards):
         config_data.append(df_sub.iloc[0]['sampleid'] + "," + build_id + "," + platform_id + "," + output_filename)
     
     #create config
-    talon_config = join(out_dir,'03_talon', 'talon_config.csv')
+    talon_config = join(out_dir,'05_talon', 'talon_config.csv')
     with open(talon_config, "w") as txt_file:
         for line in config_data:
             txt_file.write(line + "\n")
@@ -90,35 +90,35 @@ rule all:
 
         #sam files
         expand(join(out_dir,'02_sam','{bc}_sorted.sam'),bc=bc_list),
-        expand(join(out_dir,'02_sam_corrected','{bc}_sorted.sam'),bc=bc_list),
+        #expand(join(out_dir,'02_sam_corrected','{bc}_sorted.sam'),bc=bc_list),
 
         #bam files
-        expand(join(out_dir,'03_bam','{bc}.bam'),bc=bc_list),
+        #expand(join(out_dir,'03_bam','{bc}.bam'),bc=bc_list),
 
         #qc
-        expand(join(out_dir, '00_qc','fastqc','{bc}.R1_fastqc.html'),bc=bc_list),
-        expand(join(out_dir, '00_qc','samtools','{bc}_samstats.txt'),bc=bc_list),
-        join(out_dir,'00_qc','multiqc_report.html'),
-        join(out_dir,'00_qc','qc_report.html'),
+        expand(join(out_dir, '04_qc','fastqc','{bc}_trimmed.fastqc.html'),bc=bc_list),
+        expand(join(out_dir, '04_qc','samtools','{bc}_samstats.txt'),bc=bc_list),
+        join(out_dir,'04_qc','multiqc_report.html'),
+        join(out_dir,'04_qc','qc_report.html'),
 
-        #talon
-        join(out_dir,'03_talon', 'talon_config.csv'),
-        join(out_dir,'03_talon', build_id + '.db'),
-        expand(join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),bc=bc_list),
-        join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
-        join(out_dir,'06_read_counts', build_id + '_talon_summary.tsv'),
-        join(out_dir,'06_read_counts', build_id + '_talon_abundance.tsv'),
-        join(out_dir,'06_read_counts', build_id + '_whitelist.txt'),
-        join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv'),
-        join(out_dir,'07_gtf', build_id + '_talon.gtf'),
-        join(out_dir,'08_transcript_plots','abundance_plots.html'),
+        # #talon
+        # join(out_dir,'05_talon', 'talon_config.csv'),
+        # join(out_dir,'05_talon', build_id + '.db'),
+        # expand(join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),bc=bc_list),
+        # join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
+        # join(out_dir,'06_read_counts', build_id + '_talon_summary.tsv'),
+        # join(out_dir,'06_read_counts', build_id + '_talon_abundance.tsv'),
+        # join(out_dir,'06_read_counts', build_id + '_whitelist.txt'),
+        # join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv'),
+        # join(out_dir,'07_gtf', build_id + '_talon.gtf'),
+        # join(out_dir,'08_transcript_plots','abundance_plots.html'),
 
         #flair
-        join(out_dir,'01_fastq','merged.fastq.gz'),
-        join(out_dir,'09_flair','merged_flair.isoforms.fa'),
-        join(out_dir,'09_talon','flair_config.csv'),
-        join(out_dir,'09_flair','counts_matrix.tsv'),
-        #expand(join(out_dir,'09_flair','diff_iso_{group_id}.txt'),group_id=group_list),
+        # join(out_dir,'01_fastq','merged.fastq.gz'),
+        # join(out_dir,'09_flair','merged_flair.isoforms.fa'),
+        # join(out_dir,'09_flair','flair_config.csv'),
+        # join(out_dir,'09_flair','counts_matrix.tsv'),
+        # expand(join(out_dir,'09_flair','diff_iso_{group_id}.txt'),group_id=group_list),
 
         # #squanti
         # #join(out_dir,'tbd'),
@@ -154,7 +154,7 @@ rule adaptor_trim:
     input:
         f1 = join(out_dir,'01_fastq','{bc}.fastq.gz')
     params:
-        rname = "trim_adaptors",
+        rname = "01_trim_adaptors",
         doc = porechop_conda,
     envmodules:
         config['singularity'],
@@ -162,7 +162,7 @@ rule adaptor_trim:
         o1 = join(out_dir,'01_fastq','{bc}_trimmed.fastq.gz')
     shell:
         '''
-        singularity shell -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
             {params.doc} porechop -i {input.f1} -o {output.o1} -t 2
         '''
 
@@ -197,23 +197,25 @@ rule clean_sam:
     input:
         f1 = join(out_dir,'02_sam','{bc}_sorted.sam')
     params:
-        rname = "clean_sam",
+        rname = "02_clean_sam",
         anno_fa = anno_fa,
-        base = join(out_dir,'02_sam_corrected','{bc}')
-    container: 
-        talon_conda
+        base = join(out_dir,'02_sam_corrected','{bc}'),
+        doc = talon_conda,
+    envmodules:
+        config['singularity'],
     output:
         o1 = join(out_dir,'02_sam_corrected','{bc}_sorted.sam')
     shell:
         '''
-        TranscriptClean.py --sam {input.f1} --genome {params.anno_fa} --outprefix {params.base} --deleteTmp
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+            {params.doc} TranscriptClean.py --sam {input.f1} --genome {params.anno_fa} --outprefix {params.base} --deleteTmp
         '''
 
 rule create_bam:
     input:
         f1 = join(out_dir,'02_sam_corrected','{bc}_sorted.sam')
     params:
-        rname='03_bam'
+        rname='03_bam',
     envmodules:
         config['samtools']
     output:
@@ -231,17 +233,18 @@ rule qc_fastq:
     Runs FastQC report on each sample 
     """
     input:
-        f1 = join(out_dir,'01_fastq','{bc}_trimmed.fastq.gz')
+        bam = join(out_dir, '03_bam','{bc}_sorted.bam'),
+        fq = join(out_dir,'01_fastq','{bc}_trimmed.fastq.gz')
     params:
-        rname='03_fqc',
-        base = join(out_dir, '00_qc','fastqc'),
+        rname='04_fqc',
+        base = join(out_dir, '04_qc','fastqc'),
     envmodules:
         config['fastqc']
     output:
-        o1 = join(out_dir, '00_qc','fastqc','{bc}.R1_fastqc.html')
+        o1 = join(out_dir, '04_qc','fastqc','{bc}_trimmed.fastqc.html')
     shell:
         """
-        fastqc {input.f1} -o {params.base}
+        fastqc {input.fq} -o {params.base}
         """
 
 rule qc_samstats:
@@ -253,11 +256,11 @@ rule qc_samstats:
     input:
         f1 = join(out_dir, '03_bam','{bc}_sorted.bam')
     params:
-        rname='03_samstats'
+        rname='04_samstats'
     envmodules:
         config['samtools']
     output:
-        o1 = join(out_dir, '00_qc','samtools','{bc}_samstats.txt')
+        o1 = join(out_dir, '04_qc','samtools','{bc}_samstats.txt')
     shell:
         """
         samtools view -h {input.f1} | samtools stats - > {output.o1}
@@ -269,18 +272,18 @@ rule qc_multiqc:
     https://multiqc.info/docs/#running-multiqc
     """
     input:
-        f1 = expand(join(out_dir, '00_qc', 'fastqc','{bc}.R1_fastqc.html'),bc=bc_list),
-        f2 = expand(join(out_dir, '00_qc', 'samtools','{bc}_samstats.txt'),bc=bc_list)
+        f1 = expand(join(out_dir, '04_qc', 'fastqc','{bc}_trimmed.fastqc.html'),bc=bc_list),
+        f2 = expand(join(out_dir, '04_qc', 'samtools','{bc}_samstats.txt'),bc=bc_list)
     params:
-        rname = '03_multiqc',
-        out = join(out_dir,'00_qc'),
+        rname = '04_multiqc',
+        out = join(out_dir,'04_qc'),
         qc_config = join(source_dir,'config','multiqc_config.yaml'),
-        dir_fastq = expand(join(out_dir, '00_qc', 'fastqc')),
-        dir_screen_species = expand(join(out_dir, '00_qc', 'screen')),
+        dir_fastq = expand(join(out_dir, '04_qc', 'fastqc')),
+        dir_screen_species = expand(join(out_dir, '04_qc', 'screen')),
     envmodules:
         config['multiqc']
     output:
-        o1 = join(out_dir,'00_qc','multiqc_report.html')
+        o1 = join(out_dir,'04_qc','multiqc_report.html')
     shell:
         """
         multiqc -f -v -c {params.qc_config} \
@@ -297,19 +300,19 @@ rule qc_alignment:
     input:
         f1 = join(out_dir, '03_bam','{bc}_sorted.bam')
     params:
-        rname = "03_qc_align",
+        rname = "04_qc_align",
         R = join(source_dir,'workflow','scripts','alignment_stats.R'),
-        base = join(out_dir, '00_qc', 'alignment/')
+        base = join(out_dir, '04_qc', 'alignment/')
     envmodules:
         config['samtools'],
         config['R']
     output:
-        bam_a = join(out_dir, '00_qc', 'alignment','{bc}_align_len.txt'),
-        bam_u = join(out_dir, '00_qc', 'alignment','{bc}_unalign_len.txt'),
-        png_align = join(out_dir, '00_qc', 'alignment','{bc}_aligned.png'),
-        png_unalign = join(out_dir, '00_qc', 'alignment','{bc}_unaligned.png'),
-        txt_align = join(out_dir, '00_qc', 'alignment','{bc}_aligned.txt'),
-        txt_unalign = join(out_dir, '00_qc', 'alignment','{bc}_unaligned.txt'),
+        bam_a = join(out_dir, '04_qc', 'alignment','{bc}_align_len.txt'),
+        bam_u = join(out_dir, '04_qc', 'alignment','{bc}_unalign_len.txt'),
+        png_align = join(out_dir, '04_qc', 'alignment','{bc}_aligned.png'),
+        png_unalign = join(out_dir, '04_qc', 'alignment','{bc}_unaligned.png'),
+        txt_align = join(out_dir, '04_qc', 'alignment','{bc}_aligned.txt'),
+        txt_unalign = join(out_dir, '04_qc', 'alignment','{bc}_unaligned.txt'),
     shell:
         """
         samtools view -F 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_a}; \
@@ -322,17 +325,17 @@ rule qc_troubleshoot:
         generates a PDF of barcode plots and alignment plots for qc troubleshooting
         """
         input:
-            png_align = expand(join(out_dir, '00_qc', 'alignment','{bc}_aligned.png'), bc=bc_list),
-            png_unalign = expand(join(out_dir, '00_qc', 'alignment','{bc}_unaligned.png'), bc=bc_list),
-            txt_align = expand(join(out_dir, '00_qc', 'alignment','{bc}_aligned.txt'), bc=bc_list),
-            txt_unalign = expand(join(out_dir, '00_qc', 'alignment','{bc}_unaligned.txt'), bc=bc_list),
+            png_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_aligned.png'), bc=bc_list),
+            png_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_unaligned.png'), bc=bc_list),
+            txt_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_aligned.txt'), bc=bc_list),
+            txt_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_unaligned.txt'), bc=bc_list),
         params:
-            rname = "03_qc_ts",
+            rname = "04_qc_ts",
             R = join(source_dir,'workflow','scripts','qc_report_nondemux.Rmd'),
         envmodules:
             config['R']
         output:
-            o1 = join(out_dir,'00_qc','qc_report.html')
+            o1 = join(out_dir,'04_qc','qc_report.html')
         shell:
             """
             Rscript -e 'library(rmarkdown); \
@@ -349,10 +352,10 @@ rule talon_config:
     input:
         f1 = expand(join(out_dir,'01_fastq','{bc}_trimmed.fastq.gz'),bc=bc_list),
     params:
-        rname = "talon_config",
+        rname = "05_talon_config",
         process = talon_config
     output:
-        o1 = join(out_dir,'03_talon','talon_config.csv')
+        o1 = join(out_dir,'05_talon','talon_config.csv')
 
 rule talon_db:
     '''
@@ -364,14 +367,16 @@ rule talon_db:
         rname = "03_talon_db",
         a_id = annotation_id,
         b_id = build_id,
-        base = join(out_dir,'03_talon',build_id)
+        base = join(out_dir,'05_talon',build_id),
+        doc = talon_conda,
     output:
-        o1 = join(out_dir,'03_talon',build_id + '.db')
-    container: 
-        talon_conda
+        o1 = join(out_dir,'05_talon',build_id + '.db')
+    envmodules:
+        config['singularity'],
     shell:
         '''
-        talon_initialize_database \
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+            {params.doc} talon_initialize_database \
             --f {input.anno} \
             --a {params.a_id}\
             --g {params.b_id} \
@@ -398,15 +403,17 @@ rule talon_prime:
         anno = anno_fa,
         base_tmp = join(out_dir,'tmp' + '_' + '{bc}'),
         base_sample = join(out_dir,'04_sam_labeled','{bc}'),
-        p_len = primer_len
+        p_len = primer_len,
+        doc = talon_conda,
     output:
         o1 = join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),
         o2 = join(out_dir,'04_sam_labeled','{bc}_read_labels.tsv'),
-    container: 
-        talon_conda
+    envmodules:
+        config['singularity'],
     shell:
         '''
-        talon_label_reads --f {input.f1} \
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+            {params.doc} talon_label_reads --f {input.f1} \
             --g {params.anno} \
             --t 1 \
             --ar {params.p_len} \
@@ -420,22 +427,24 @@ rule talon_annotation:
     annotate and quantify reads; modify db
     '''
     input:
-        db = join(out_dir, '03_talon', build_id + '.db'),
-        t_config = join(out_dir, '03_talon', 'talon_config.csv'),
+        db = join(out_dir, '05_talon', build_id + '.db'),
+        t_config = join(out_dir, '05_talon', 'talon_config.csv'),
         sam = expand(join(out_dir,'04_sam_labeled','{bc}_labeled.sam'),bc=bc_list)
     params:
         rname = "05_annotate",
         b_id = build_id,
         base_tmp = join(out_dir,'tmp_annotations/'),
-        base_sample = join(out_dir,'05_annotation',build_id)
+        base_sample = join(out_dir,'05_annotation',build_id),
+        doc = talon_conda,
     output:
         o1 = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
         o2 = join(out_dir,'05_annotation', build_id + '_QC.log'),
-    container: 
-        talon_conda
+    envmodules:
+        config['singularity'],
     shell:
         '''
-        talon \
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+            {params.doc} talon \
             --f {input.t_config} \
             --db {input.db} \
             --build {params.b_id} \
@@ -449,18 +458,20 @@ rule talon_summary:
     summarize how many transcripts before filtering
     '''
     input:
-        db = join(out_dir,'03_talon',build_id + '.db'),
+        db = join(out_dir,'05_talon',build_id + '.db'),
         anno = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
     params:
         rname = "06.1_summary",
-        base = join(out_dir,'06_read_counts', build_id)
+        base = join(out_dir,'06_read_counts', build_id),
+        doc = talon_conda,
     output:
         o1 = join(out_dir,'06_read_counts', build_id + '_talon_summary.tsv')
-    container: 
-        talon_conda
+    envmodules:
+        config['singularity'],
     shell:
         '''
-        talon_summarize --db {input.db} --v --o {params.base}
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+            {params.doc} talon_summarize --db {input.db} --v --o {params.base}
         '''
 
 rule talon_counts:
@@ -468,7 +479,7 @@ rule talon_counts:
     abundance matrix (for comp gene expression) without filtering
     '''
     input:
-        db = join(out_dir,'03_talon',build_id + '.db'),
+        db = join(out_dir,'05_talon',build_id + '.db'),
         anno = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
     params:
         rname = "06.2_abundance",
@@ -477,11 +488,12 @@ rule talon_counts:
         base = join(out_dir,'06_read_counts', build_id)
     output:
         o1 = join(out_dir,'06_read_counts', build_id + '_talon_abundance.tsv')
-    container: 
-        talon_conda
+    envmodules:
+        config['singularity'],
     shell:
         '''
-        talon_abundance --db {input.db} -a {params.a_id} --build {params.b_id} --o {params.base}
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+            {params.doc} talon_abundance --db {input.db} -a {params.a_id} --build {params.b_id} --o {params.base}
         '''
 
 rule talon_whitelist:
@@ -489,21 +501,23 @@ rule talon_whitelist:
     repeat with TALON filters
     '''
     input:
-        db = join(out_dir,'03_talon',build_id + '.db'),
+        db = join(out_dir,'05_talon',build_id + '.db'),
         anno = join(out_dir,'05_annotation', build_id + '_talon_read_annot.tsv'),
     params:
         rname = "06.3_whitelist",
         a_id = annotation_id,
         max_frac  = maxFracA,
         min_count = minCount,
-        min_ds = minDatasets
+        min_ds = minDatasets,
+        doc = talon_conda,
     output:
         o1 = join(out_dir,'06_read_counts',build_id + '_whitelist.txt')
-    container: 
-        talon_conda
+    envmodules:
+        config['singularity'],
     shell:
         '''
-        talon_filter_transcripts \
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+            {params.doc} talon_filter_transcripts \
             --db {input.db} \
             -a {params.a_id} \
             --maxFracA {params.max_frac} \
@@ -517,20 +531,22 @@ rule talon_abundance_filtered:
     abundance matrix (for comp gene expression) with filtering
     '''
     input:
-        db = join(out_dir,'03_talon',build_id + '.db'),
+        db = join(out_dir,'05_talon',build_id + '.db'),
         white_list = join(out_dir,'06_read_counts',build_id + '_whitelist.txt')
     params:
         rname = "06.4_abundance_filt",
         a_id = annotation_id,
         b_id = build_id,
-        base = join(out_dir,'06_read_counts', build_id)
+        base = join(out_dir,'06_read_counts', build_id),
+        doc = talon_conda,
     output:
         o1 = join(out_dir,'06_read_counts', build_id + '_talon_abundance_filtered.tsv')
-    container: 
-        talon_conda
+    envmodules:
+        config['singularity'],
     shell:
         '''
-        talon_abundance \
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+            {params.doc} talon_abundance \
             --db {input.db} \
             -a {params.a_id} \
             --whitelist {input.white_list} \
@@ -543,20 +559,22 @@ rule talon_gtf:
     create custom GTF of filtered transcripts
     '''
     input:
-        db = join(out_dir,'03_talon',build_id + '.db'),
+        db = join(out_dir,'05_talon',build_id + '.db'),
         w_list = join(out_dir,'06_read_counts',build_id + '_whitelist.txt')
     params:
         rname = "07_gtf",
         a_id = annotation_id,
         b_id = build_id,
-        base = join(out_dir,'07_gtf', build_id)
+        base = join(out_dir,'07_gtf', build_id),
+        doc = talon_conda,
     output:
         o1 = join(out_dir,'07_gtf', build_id + '_talon.gtf')
-    container: 
-        talon_conda
+    envmodules:
+        config['singularity'],
     shell:
         '''
-        talon_create_GTF \
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+            {params.doc} talon_create_GTF \
             --db {input.db} \
             --whitelist {input.w_list} \
             -a {params.a_id} \
@@ -596,13 +614,13 @@ rule merge_fq:
     input:
         fqs = expand(join(out_dir,'01_fastq','{bc}_trimmed.fastq.gz'),bc=bc_list)
     params:
-        rname = "create_sam",
-        base = join(fastq_dir,'01_fastq')
+        rname = "09_merge_fq",
+        base = join(out_dir,'01_fastq')
     output:
         o1 = join(out_dir,'01_fastq','merged.fastq.gz')
     shell:
         '''
-        zcat {params.base}/*.gz | gzip -n -> {output.o1}
+        zcat {params.base}/*trimmed.fastq.gz | gzip -n -> {output.o1}
         '''
 
 rule flair_isoforms:
@@ -620,7 +638,7 @@ rule flair_isoforms:
     input:
         f1 = join(out_dir,'01_fastq','merged.fastq.gz')
     params:
-        rname = "flair_isoforms",
+        rname = "09_flair_isoforms",
         doc = flair_conda,
         anno_fa = anno_fa,
         anno_gtf = anno_gtf,
@@ -632,7 +650,7 @@ rule flair_isoforms:
         o1 = join(out_dir,'09_flair','merged_flair.isoforms.fa')
     shell:
         '''
-        singularity shell -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
             {params.doc} flair.py 123 -g {params.anno_fa} \
             -r  {input.f1} \
             -f {params.anno_gtf} \
@@ -648,10 +666,10 @@ rule flair_config:
     input:
         f1 = expand(join(out_dir,'01_fastq','{bc}_trimmed.fastq.gz'),bc=bc_list),
     params:
-        rname = "flair_config",
+        rname = "09_flair_config",
         process = flair_config
     output:
-        o1 = join(out_dir,'09_talon','flair_config.csv')
+        o1 = join(out_dir,'09_flair','flair_config.csv')
 
 rule flair_abundances:
     '''
@@ -666,10 +684,10 @@ rule flair_abundances:
     --temp_dir /scratch/kopardevn/rbl3_test_out/fastq/flair.quantify.tmpdir
     '''
     input:
-        config = join(out_dir,'09_talon','flair_config.csv'),
+        config = join(out_dir,'09_flair','flair_config.csv'),
         iso = join(out_dir,'09_flair','merged_flair.isoforms.fa')
     params:
-        rname = "flair_abundances",
+        rname = "09_flair_abundances",
         docs = flair_conda,
         tmp_dir = join(out_dir,'09_flair','tmp_abund'),
     envmodules:
@@ -678,7 +696,7 @@ rule flair_abundances:
         o1 = join(out_dir,'09_flair','counts_matrix.tsv')
     shell:
         '''
-        singularity shell -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+        singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
             {params.docs} flair.py quantify \
             -r {input.config} \
             --threads 16 \
@@ -709,12 +727,11 @@ rule flair_abundances:
 #         o1 = join(out_dir,'09_flair','diff_iso_{group_id}.txt')
 #     shell:
 #     '''
-#     singularity shell -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
+#     singularity exec -B /data/$USER,/data/RBL_NCI,{out_dir},/fdb,/scratch \
 #         {params.doc} bash -c "python3 /opt2/flair/bin/diff_iso_usage.py \
 #         bash -c "python3 {params.scripts} {input.counts} wt1_wt_b1 ko_drosha1_ko_drosha_b1 /scratch/kopardevn/rbl3_test_out/fastq/diff_iso_ko_drosha.txt"
 #         singularity exec -B /scratch/kopardevn,/data/CCBR_Pipeliner /scratch/kopardevn/rbl3_test_out/ccbr_flair_v1.5.sif \
 #         bash -c "python3 /opt2/flair/bin/diff_iso_usage.py /scratch/kopardevn/rbl3_test_out/fastq/counts_matrix.tsv wt1_wt_b1 ko_dicer1_ko_dicer_b1 /scratch/kopardevn/rbl3_test_out/fastq/diff_iso_ko_dicer.txt"
-
 #     '''
 
 
