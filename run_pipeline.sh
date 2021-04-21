@@ -28,7 +28,7 @@ log_time=`date +"%Y%m%d_%H%M"`
 s_time=`date +"%Y%m%d_%H%M%S"`
 
 #clean config_output_dir
-output_dir=${config_output_dir}
+output_dir=$(echo $config_output_dir | sed 's:/*$::')
 source_dir=$(echo $config_source_dir | sed 's:/*$::')
 
 #singularity params
@@ -63,6 +63,7 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
   else
     mkdir "${output_dir}/workflow"
     cp -r "${source_dir}/workflow/" "${output_dir}/"
+    echo "Creating archive of snakemake files"
   fi
 
   #submit jobs to cluster
