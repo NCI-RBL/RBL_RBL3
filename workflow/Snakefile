@@ -62,12 +62,13 @@ def flair_config(wildcards):
     config_data = []
 
     #for each of the barcodes, generate config info
+    #sampleid condition batchid fastqfile
     #example: wt1	wt	b1	/scratch/kopardevn/rbl3_test_out/fastq/barcode01.trimmed.R1.fastq.gz
     for bc in bc_list:
         df_sub = df_sample[df_sample["filename"] == bc]
         
-        fq_name = join(fastq_dir,'01_fastq_trimmed',bc + '.fastq.gz')
-        config_data.append(df_sub.iloc[0]['sampleid'] + "\t" + df_sub.iloc[0]['groupid'] + "\t" + "b1" + "\t" + fq_name)
+        fq_name = join(out_dir,'06_flair','fastq', bc + '.fastq')
+        config_data.append(df_sub.iloc[0]['sampleid'] + "\t" + df_sub.iloc[0]['groupid'] + "\t" + df_sub.iloc[0]['batchid'] + "\t" + fq_name)
     
     #create config
     flair_config = join(out_dir,'06_flair', 'flair_config.csv')
@@ -117,11 +118,12 @@ rule all:
         join(out_dir,'06_flair','merged.fastq.gz'),
         join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa'),
         join(out_dir,'06_flair','flair_config.csv'),
-        # join(out_dir,'06_flair','counts','counts_matrix.tsv'),
+        expand(join(out_dir,'06_flair','fastq','{bc}.fastq'),bc=bc_list),
+        join(out_dir,'06_flair','counts','flair_counts_matrix.tsv'),
         # expand(join(out_dir,'06_flair','diff','diff_iso_{group_id}.txt'),group_id=group_list),
 
         #report
-        #join(out_dir,'07_report','abundance_plots.html'),
+        join(out_dir,'07_report','summary_report.html'),
 
         # #squanti
         # #join(out_dir,'tbd'),
@@ -287,7 +289,7 @@ rule qc_multiqc:
         f2 = expand(join(out_dir, '04_qc', 'samtools','{bc}_samstats.txt'),bc=bc_list)
     params:
         rname = '04_multiqc',
-        out = join(out_dir,'04_qc'),
+        out = join(out_dir,'07_report'),
         qc_config = join(source_dir,'config','multiqc_config.yaml'),
         dir_fastq = expand(join(out_dir, '04_qc', 'fastqc')),
     envmodules:
@@ -592,32 +594,6 @@ rule talon_gtf:
             --o {params.base}
         '''
 
-rule abundance_plots:
-    input:
-        unfilt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
-        filt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv')
-    params:
-        rname = "07_abundance_plots",
-        R = join(source_dir,"workflow","scripts","transcript_types.Rmd"),
-        base = join(out_dir,'07_report'),
-        perc_sim = perc_sim,
-        num_match = num_match
-    envmodules:
-        config['R'],
-    output:
-        o1 = join(out_dir,'07_report','abundance_plots.html')
-    shell:
-        '''
-        Rscript -e 'library(rmarkdown); \
-        rmarkdown::render("{params.R}",
-            output_file = "{output.o1}", \
-            params= list(f_data = "{input.filt}", \
-                u_data = "{input.unfilt}", \
-                output_dir = "{params.base}", \
-                perc_sim = "{params.perc_sim}", \
-                num_match = "{params.num_match}"))'
-        '''
-
 rule merge_fq:
     '''
     '''
@@ -656,7 +632,7 @@ rule flair_isoforms:
         doc = flair_conda,
         anno_fa = anno_fa,
         anno_gtf = anno_gtf,
-        base = join(out_dir,'06_flair','merged_flair'),
+        base = join(out_dir,'06_flair','isoforms','merged_flair'),
         tmp_dir = join(out_dir,'06_flair','tmp_iso'),
     envmodules:
         config['singularity'],
@@ -684,11 +660,27 @@ rule flair_config:
     generate flair config
     '''
     input:
-        f1 = expand(join(out_dir,'01_fastq','{bc}_trimmed.fastq.gz'),bc=bc_list),
+        f1 = expand(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'),bc=bc_list),
     params:
         process = flair_config
     output:
         o1 = join(out_dir,'06_flair','flair_config.csv')
+
+rule flair_fastq:
+    '''
+    unzip fastq files for flair input
+    '''
+    input:
+        f1 = join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz')
+    params:
+        zip = join(out_dir,'06_flair','fastq','{bc}.fastq.gz')
+    output:
+        o1 = join(out_dir,'06_flair','fastq','{bc}.fastq')
+    shell:
+        '''
+        cp {input.f1} {params.zip}; \
+        gunzip {params.zip}
+        '''
 
 rule flair_abundances:
     '''
@@ -704,24 +696,27 @@ rule flair_abundances:
     '''
     input:
         config = join(out_dir,'06_flair','flair_config.csv'),
-        iso = join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa')
+        iso = join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa'),
+        fastq = expand(join(out_dir,'06_flair','fastq','{bc}.fastq'),bc=bc_list)
     params:
         rname = "06.3_flair_abundances",
+        sing_param = singularity_parameter, 
         docs = flair_conda,
         tmp_dir = join(out_dir,'06_flair','tmp_abund'),
-        sing_param = singularity_parameter, 
+        base = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv')
     envmodules:
         config['singularity'],
     output:
-        o1 = join(out_dir,'06_flair','counts','counts_matrix.tsv')
+        o1 = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv')
     shell:
         '''
         {params.sing_param} {params.docs} flair.py quantify \
-            -r {input.config} \
-            --threads 16 \
-            --tpm \
             -i {input.iso} \
-            --temp_dir {params.tmp_dir}
+            -r {input.config} \
+            -o {params.base} \
+            --temp_dir {params.tmp_dir} \
+            --tpm \
+            --threads 16 \
         '''
 
 # rule flair_deg:
@@ -753,6 +748,33 @@ rule flair_abundances:
 #         bash -c "python3 /opt2/flair/bin/diff_iso_usage.py /scratch/kopardevn/rbl3_test_out/fastq/counts_matrix.tsv wt1_wt_b1 ko_dicer1_ko_dicer_b1 /scratch/kopardevn/rbl3_test_out/fastq/diff_iso_ko_dicer.txt"
 #     '''
 
+rule abundance_plots:
+    input:
+        unfilt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
+        filt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
+        flair = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv')
+    params:
+        rname = "07_abundance_plots",
+        R = join(source_dir,"workflow","scripts","transcript_types.Rmd"),
+        base = join(out_dir,'07_report'),
+        perc_sim = perc_sim,
+        num_match = num_match
+    envmodules:
+        config['R'],
+    output:
+        o1 = join(out_dir,'07_report','summary_report.html')
+    shell:
+        '''
+        Rscript -e 'library(rmarkdown); \
+        rmarkdown::render("{params.R}",
+            output_file = "{output.o1}", \
+            params= list(f_talon_data = "{input.filt}", \
+                u_talon_data = "{input.unfilt}", \
+                u_flair_data = "{input.flair}", \
+                output_dir = "{params.base}", \
+                perc_sim = "{params.perc_sim}", \
+                num_match = "{params.num_match}"))'
+        '''
 
 # rule squanti:
 #     '''
