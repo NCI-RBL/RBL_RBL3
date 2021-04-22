@@ -144,3 +144,6 @@ workflow/scripts/.Rhistory
 workflow/scripts/._RBL3.Rmd
 *.v2*
 *.Rmd
+.kopardevn_dir_bash_history
+analysis/
+config/.kopardevn_dir_bash_history
