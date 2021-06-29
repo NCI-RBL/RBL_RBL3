@@ -26,12 +26,12 @@ percent_similarity: 20 #lowest percentage of A in the 20bp interval after alignm
 number_of_matches: 5 #least number of matched reads in replicates, default [5]
 
 #ref files
-annotation_gtf: "/data/CCBR/projects/rbl3/dependencies/gencode.v30.annotation.gtf"
-annotation_gff: "/data/CCBR/projects/rbl3/dependencies/Homo_sapiens_GRCh38_Ensembl_86.gff3"
-annotation_fa: "/data/CCBR/projects/rbl3/dependencies/hg38_cleanheader.fa"
+annotation_gtf: "/data/CCBR_Pipeliner/Talon_Flair/dependencies/gencode.v30.annotation.gtf"
+annotation_gff: "/data/CCBR_Pipeliner/Talon_Flair/dependencies/Homo_sapiens_GRCh38_Ensembl_86.gff3"
+annotation_fa: "/data/CCBR_Pipeliner/Talon_Flair/dependencies/hg38_cleanheader.fa"
 
 #modules, container parameters
-conda_dir: "/data/CCBR/projects/rbl3/dependencies/conda_envs/"
+conda_dir: "/data/CCBR_Pipeliner/Talon_Flair/conda_envs/"
 talon_conda: "talon_0416.sif"
 porechop_conda: "porechop_0.2.4.sif"
 flair_conda: "ccbr_flair_v1.5.sif"
