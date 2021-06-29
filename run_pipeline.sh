@@ -1,3 +1,6 @@
+module purge
+module load singularity
+module load snakemake
 pipeline=$1
 PIPELINE_HOME=$(readlink -f $(dirname "$0"))
 SINGULARITY_BINDS="-B $PIPELINE_HOME:$PIPELINE_HOME"
@@ -28,10 +31,7 @@ log_time=`date +"%Y%m%d_%H%M"`
 s_time=`date +"%Y%m%d_%H%M%S"`
 
 #clean config_output_dir
-output_dir=$(echo $config_output_dir | sed 's:/*$::')
-source_dir=$(echo $config_source_dir | sed 's:/*$::')
-
-#singularity params
+output_dir=${config_output_dir}
 SINGULARITY_BINDS="$SINGULARITY_BINDS -B $output_dir:$output_dir"
 
 #Run pipeline on cluster or locally
@@ -53,35 +53,25 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
 
   for f in ${files_save[@]}; do
     IFS='/' read -r -a strarr <<< "$f"
-    cp $f "${output_dir}/log/${log_time}_00_${strarr[-1]}"
+    cp $f "${output_dir}/log/${log_time}_${strarr[-1]}"
   done
-
-  # copy workflow dir for archiving
-  if [ -d "${output_dir}/workflow" ]
-  then
-    echo "Using previously generated RBL3 pipeline"
-  else
-    mkdir "${output_dir}/workflow"
-    cp -r "${source_dir}/workflow/" "${output_dir}/"
-    echo "Creating archive of snakemake files"
-  fi
 
   #submit jobs to cluster
   if [[ $pipeline = "cluster" ]]; then
-    sbatch --job-name="RBL3" --gres=lscratch:200 --time=120:00:00 --output=${output_dir}/log/${log_time}_00_%j_%x.out --mail-type=BEGIN,END,FAIL \
+    sbatch --job-name="RBL3" --gres=lscratch:200 --time=120:00:00 --output=${output_dir}/log/%j_%x.out --mail-type=BEGIN,END,FAIL \
     snakemake \
     --use-envmodules \
     --rerun-incomplete \
     --latency-wait 120 \
-    -s ${output_dir}/workflow/Snakefile \
-    --configfile ${output_dir}/log/${log_time}_00_snakemake_config.yaml \
+    -s workflow/Snakefile \
+    --configfile ${output_dir}/log/${log_time}_snakemake_config.yaml \
     --printshellcmds \
-    --cluster-config ${output_dir}/log/${log_time}_00_cluster_config.yml \
+    --cluster-config ${output_dir}/log/${log_time}_cluster_config.yml \
     --keep-going \
     --restart-times 1 \
     --cluster "sbatch --gres {cluster.gres} --cpus-per-task {cluster.threads} \
     -p {cluster.partition} -t {cluster.time} --mem {cluster.mem} \
-    --job-name={params.rname} --output=${output_dir}/log/${log_time}_{params.rname}.out" \
+    --job-name={params.rname} --output=${output_dir}/log/${s_time}_{params.rname}.out" \
     -j 500 --rerun-incomplete \
     --use-singularity \
     --singularity-args "$SINGULARITY_BINDS"
@@ -89,11 +79,11 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
   #submit jobs locally
   else
     snakemake \
-      -s ${output_dir}/workflow/Snakefile \
+      -s workflow/Snakefile \
       --use-envmodules \
-      --configfile ${output_dir}/log/${log_time}_00_snakemake_config.yaml \
+      --configfile ${output_dir}/log/${log_time}_snakemake_config.yaml \
       --printshellcmds \
-      --cluster-config ${output_dir}/log/${log_time}_00_cluster_config.yml \
+      --cluster-config ${output_dir}/log/${log_time}_cluster_config.yml \
       --cores 8 \
       --use-singularity \
       --rerun-incomplete \
