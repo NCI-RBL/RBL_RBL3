@@ -143,6 +143,13 @@ rule all:
         #expand(join(out_dir,'collapsed','{bc}.collapsed.group.txt'),bc=bc_list),
         #expand(join(out_dir,'collapsed','{bc}.ignored_ids.txt'),bc=bc_list),
 
+
+#common and other SMK 
+if source_dir == "":
+    include: "rules/common.smk"
+else:
+    include: join(source_dir,"workflow/rules/common.smk")
+
 rule handle_fastq:
     '''
     move and zip fastq files 
