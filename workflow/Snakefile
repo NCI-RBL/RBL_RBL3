@@ -16,6 +16,7 @@ porechop_conda = config['conda_dir'] + config['porechop_conda']
 flair_conda = config['conda_dir'] + config['flair_conda']
 
 #config user params
+clean_up=config['clean_transcripts']
 annotation_id=config['annotation_id']
 build_id=config['build_id']
 maxFracA=config['maxFracA']
@@ -76,6 +77,15 @@ def flair_config(wildcards):
         for line in config_data:
             txt_file.write(line + "\n")
 
+#input for bam dependent on whether cleanup is run
+def get_bam_input(wildcards):
+    if (clean_up=="Y"):
+        bam_input = join(out_dir,'02_sam_corrected','{wildcards.bc}.sorted_clean.sam')
+    else:
+        bam_input = join(out_dir,'02_sam','{wildcards.bc}.sorted.sam')
+
+    return(bam_input)
+
 #deg manifest
 df_deg = pd.read_csv(deg_manifest,sep=',')
 group_list = df_deg['group2']
@@ -92,7 +102,6 @@ rule all:
 
         #sam files
         expand(join(out_dir,'02_sam','{bc}.sorted.sam'),bc=bc_list),
-        expand(join(out_dir,'02_sam_corrected','{bc}.sorted_clean.sam'),bc=bc_list),
 
         #bam files
         expand(join(out_dir,'03_bam','{bc}.sorted.bam'),bc=bc_list),
@@ -198,35 +207,36 @@ rule create_sam:
         samtools sort {output.sam} -o {output.sorted}
         '''
 
-rule clean_sam:
-    '''
-    https://github.com/mortazavilab/TranscriptClean
+if (clean_up=="Y"):
+    rule clean_sam:
+        '''
+        https://github.com/mortazavilab/TranscriptClean
 
-    cCrrects mismatches, microindels, and noncanonical splice junctions in long reads that have been mapped to the genome 
-    '''
-    input:
-        f1 = join(out_dir,'02_sam','{bc}.sorted.sam')
-    params:
-        rname = "02_sam_corrected",
-        sing_param = singularity_parameter, 
-        doc = talon_conda,
-        anno_fa = anno_fa,
-        base = join(out_dir,'02_sam_corrected','{bc}.sorted'),
-        tmp = join(out_dir,'02_sam_corrected','tmp_{bc}'),    
-    envmodules:
-        config['singularity'],
-    output:
-        o1 = join(out_dir,'02_sam_corrected','{bc}.sorted_clean.sam')
-    shell:
+        Corrects mismatches, microindels, and noncanonical splice junctions in long reads that have been mapped to the genome 
         '''
-        mkdir {params.tmp}; \
-        {params.sing_param} {params.doc} TranscriptClean.py --sam={input.f1} --genome={params.anno_fa} \
-            --tmpDir={params.tmp} --outprefix={params.base} --deleteTmp
-        '''
+        input:
+            f1 = join(out_dir,'02_sam','{bc}.sorted.sam')
+        params:
+            rname = "02_sam_corrected",
+            sing_param = singularity_parameter, 
+            doc = talon_conda,
+            anno_fa = anno_fa,
+            base = join(out_dir,'02_sam_corrected','{bc}.sorted'),
+            tmp = join(out_dir,'02_sam_corrected','tmp_{bc}'),    
+        envmodules:
+            config['singularity'],
+        output:
+            o1 = join(out_dir,'02_sam_corrected','{bc}.sorted_clean.sam')
+        shell:
+            '''
+            mkdir {params.tmp}; \
+            {params.sing_param} {params.doc} TranscriptClean.py --sam={input.f1} --genome={params.anno_fa} \
+                --tmpDir={params.tmp} --outprefix={params.base} --deleteTmp
+            '''
 
 rule create_bam:
     input:
-        f1 = join(out_dir,'02_sam_corrected','{bc}.sorted_clean.sam')
+        f1 = get_bam_input
     params:
         rname='03_bam',
     envmodules:
@@ -819,4 +829,24 @@ rule abundance_plots:
 #     shell:
 # '''
 
+'''
+## download 
+   params:
+            rname = '01a_dl_fa',
+            ftp = 'http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M' + gencode_v + '/GRCm38.p6.genome.fa.gz',
+            base = join(out_dir, species, '01_source')
+        output:
+            o1 =  join(out_dir, species, '01_source', 'GRCm38.p6.genome.fa.gz'),
+        shell:
+            """
+            wget -P {params.base} {params.ftp}
+'http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M' + gencode_v + '/GRCm38.p6.genome.fa.gz',
 
+fa_file= "${project_location}/01_mask_fasta/mm10.fa"
+bed_file= "${project_location}/01_mask_fasta/ccbr1114.bed"
+output_file = "${project_location}/01_mask_fasta/masked_mm10.fa"
+
+## mask fasta
+## doc: https://bedtools.readthedocs.io/en/latest/content/tools/maskfasta.html
+
+'''

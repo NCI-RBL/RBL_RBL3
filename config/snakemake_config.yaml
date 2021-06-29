@@ -14,6 +14,7 @@ deg_manifest: "/data/CCBR/projects/rbl3/manifest/deg_manifest.txt"
 fastq_dir: "/data/RBL_NCI/Gu/chunmei/nanopore_rawfastqs/"
 
 #user parameters
+clean_transcripts: "Y" #if Y Transcriptclean will be run - read feature info in documentation
 annotation_id: "SIRV_annot"
 build_id: "SIRV"
 platform_id: "Illumina"
