@@ -5,6 +5,8 @@ pipeline=$1
 PIPELINE_HOME=$(readlink -f $(dirname "$0"))
 SINGULARITY_BINDS="-B $PIPELINE_HOME:$PIPELINE_HOME"
 SINGULARITY_BINDS="$SINGULARITY_BINDS -B /data/CCBR_Pipeliner/:/data/CCBR_Pipeliner/"
+SINGULARITY_BINDS="$SINGULARITY_BINDS -B /data/CCBR/:/data/CCBR/"
+SINGULARITY_BINDS="$SINGULARITY_BINDS -B /data/RBL_NCI/:/data/RBL_NCI/"
 
 #handle yaml file
 parse_yaml() {

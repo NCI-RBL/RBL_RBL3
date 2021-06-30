@@ -10,7 +10,7 @@ fastq_dir = config['fastq_dir'].rstrip('/') + '/'
 sample_manifest=config['sample_manifest']
 deg_manifest = config['deg_manifest']
 
-singularity_parameter = 'singularity exec -B /data/$USER,/data/RBL_NCI,/fdb,/scratch,/data/CCBR,' + out_dir
+singularity_parameter = 'singularity exec -B /data/,/fdb/,/scratch/,' + out_dir
 talon_conda = config['conda_dir'] + config['talon_conda']
 porechop_conda = config['conda_dir'] + config['porechop_conda']
 flair_conda = config['conda_dir'] + config['flair_conda']
@@ -165,15 +165,12 @@ rule handle_fastq:
         f1 = join(fastq_dir,'{bc}.fastq')
     params:
         rname = "01_fq",
-        base = join(out_dir,'01_fastq','{bc}.fastq'),
-        unzip = join(out_dir,'01_fastq','{bc}.fastq'),
     output:
         zip = join(out_dir,'01_fastq','{bc}.fastq.gz')
     shell:
-        '''
-        cp {input.f1} {params.unzip}; \
-        gzip {params.unzip}
-        '''
+        """
+        gzip -c {input.f1} > {output.zip}
+        """
 
 rule adaptor_trim:
     '''
@@ -327,7 +324,7 @@ rule qc_multiqc:
             -o {params.out}
         """
 
-if (masked_ref=="Y"):
+if (masked_refs=="Y"):
     rule qc_alignment:
         """
         uses samtools to create a bams of unaligned reads and aligned reads
