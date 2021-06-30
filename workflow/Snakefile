@@ -29,13 +29,24 @@ perc_sim = config['percent_similarity']
 num_match = config['number_of_matches']
 
 #ref information
+def get_annotation_gtf(wildcards):
+    if({wildcards.masked_flag} == "masked"):
+        anno_gtf=config['annotation_gtf_masked']
+    else:
+        anno_gtf=config['annotation_gtf']
+    return(anno_gtf)
+
+def get_annotation_fa(wildcards):
+    if ({wildcards.masked_flag} == "masked"):
+        anno_fa=config['annotation_fa_masked']
+    else:
+        anno_fa=config['annotation_fa']
+    return(anno_fa)
+
+#masked list
 if (masked_refs =="Y"):
-    anno_gtf=[config['annotation_gtf'],config['annotation_gtf_masked']]
-    anno_fa=[config['annotation_fa'],config['annotation_fa_masked']]
     masked_list=["masked","unmasked"]
 else:
-    anno_gtf=config['annotation_gtf']
-    anno_fa=config['annotation_fa']
     masked_list=["unmasked"]
 
 #barcode list
@@ -108,7 +119,7 @@ rule all:
         expand(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'),bc=bc_list),
 
         #sam files
-        expand(join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam'),bc=bc_list, masked_flag=masked_list),
+        #expand(join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam'),bc=bc_list, masked_flag=masked_list),
 
         # #bam files
         # expand(join(out_dir,'03_bam','{bc}.sorted.bam'),bc=bc_list),
@@ -149,7 +160,6 @@ rule all:
         #expand(join(out_dir,'collapsed','{bc}.collapsed.rep.fq'),bc=bc_list),
         #expand(join(out_dir,'collapsed','{bc}.collapsed.group.txt'),bc=bc_list),
         #expand(join(out_dir,'collapsed','{bc}.ignored_ids.txt'),bc=bc_list),
-
 
 #common and other SMK 
 if source_dir == "":
@@ -203,7 +213,7 @@ rule create_sam:
         f1 = join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz')
     params:
         rname = "02_sam",
-        fa = anno_fa
+        fa = get_annotation_fa
     envmodules:
         config['minimap2'],
         config['samtools']
@@ -231,7 +241,7 @@ if (clean_up=="Y"):
             rname = "02_sam_corrected",
             sing_param = singularity_parameter, 
             doc = talon_conda,
-            anno_fa = anno_fa,
+            anno_fa = get_annotation_fa,
             base = join(out_dir,'02_sam_corrected','{bc}.sorted'),
             tmp = join(out_dir,'02_sam_corrected','tmp_{bc}'),    
         envmodules:
@@ -450,7 +460,7 @@ rule talon_db:
     initialize db
     '''
     input:
-        anno = anno_gtf,
+        anno = get_annotation_gtf,
     params:
         rname = "05.1_talon_db",
         sing_param = singularity_parameter, 
@@ -490,7 +500,7 @@ rule talon_prime:
         rname = "05.2_sam_label",
         sing_param = singularity_parameter, 
         doc = talon_conda,
-        anno = anno_fa,
+        anno = get_annotation_fa,
         base_tmp = join(out_dir,'tmp' + '_' + '{bc}'),
         base_sample = join(out_dir,'05_talon','sam_labeled','{bc}'),
         p_len = primer_len, 
@@ -707,8 +717,8 @@ rule flair_isoforms:
         rname = "06.2_flair_isoforms",
         sing_param = singularity_parameter, 
         doc = flair_conda,
-        anno_fa = anno_fa,
-        anno_gtf = anno_gtf,
+        anno_fa = get_annotation_fa,
+        anno_gtf = get_annotation_gtf,
         base = join(out_dir,'06_flair','isoforms','merged_flair'),
         tmp_dir = join(out_dir,'06_flair','tmp_iso'),
     envmodules:
