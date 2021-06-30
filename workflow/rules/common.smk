@@ -10,6 +10,6 @@ container: "docker://continuumio/miniconda3"
 configfile: "config/snakemake_config.yaml"
 validate(config, schema="../schemas/config.schema.yaml")
 
-samples = pd.read_csv(config["sample_manifest"], sep="\t").set_index("sample", drop=False)
-samples.index.names = ["sample_id"]
+samples = pd.read_csv(config["sample_manifest"], sep="\t").set_index("sampleid", drop=False)
+samples.index.names = ["filename"]
 validate(samples, schema="../schemas/samples.schema.yaml")
