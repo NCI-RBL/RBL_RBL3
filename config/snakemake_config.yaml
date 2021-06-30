@@ -19,9 +19,9 @@ clean_transcripts: "Y" #if Y Transcriptclean will be run - read feature info in 
 annotation_id: "SIRV_annot" #use as a label for annotation used
 build_id: "SIRV" #use as a label for the build or version running
 platform_id: "Illumina" #use as a label for the platform sequenced
-maxFracA: "0.5" #maximum fraction of A's in the window located immediately after any read assigned to a novel transcript; use 1 to not filter [Default: .5]
-minCount: "5" #Number of minimum occurrences required for a novel transcript PER dataset [Default: 5]
-minDatasets: "2" #Minimum number of datasets novel transcripts must be found in [Default: 2]
+maxFracA: 0.5 #maximum fraction of A's in the window located immediately after any read assigned to a novel transcript; use 1 to not filter [Default: .5]
+minCount: 5 #Number of minimum occurrences required for a novel transcript PER dataset [Default: 5]
+minDatasets: 2 #Minimum number of datasets novel transcripts must be found in [Default: 2]
 primer_length: 20 #match the length of the T sequence in your primer, [Default: 20]
 percent_similarity: 20 #lowest percentage of A in the 20bp interval after alignment [Default: 20]
 number_of_matches: 5 #least number of matched reads in replicates [Default: 5]

@@ -42,9 +42,6 @@ properties:
   number_of_matches:
     type: number
     description: least number of matched reads in replicates
-  nt_merge:
-    type: number
-    description: minimum distance of nucleotides to merge peaks
   conda_dir:
     type: string
     description: /path/to/conda/
@@ -63,5 +60,4 @@ required:
   - primer_length
   - percent_similarity
   - number_of_matches
-  - nt_merge
   - conda_dir
