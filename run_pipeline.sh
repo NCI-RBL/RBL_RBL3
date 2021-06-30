@@ -1,12 +1,5 @@
-module purge
-module load singularity
-module load snakemake
 pipeline=$1
-PIPELINE_HOME=$(readlink -f $(dirname "$0"))
-SINGULARITY_BINDS="-B $PIPELINE_HOME:$PIPELINE_HOME"
-SINGULARITY_BINDS="$SINGULARITY_BINDS -B /data/CCBR_Pipeliner/:/data/CCBR_Pipeliner/"
-SINGULARITY_BINDS="$SINGULARITY_BINDS -B /data/CCBR/:/data/CCBR/"
-SINGULARITY_BINDS="$SINGULARITY_BINDS -B /data/RBL_NCI/:/data/RBL_NCI/"
+
 
 #handle yaml file
 parse_yaml() {
@@ -32,12 +25,23 @@ eval $(parse_yaml config/snakemake_config.yaml "config_")
 log_time=`date +"%Y%m%d_%H%M"`
 s_time=`date +"%Y%m%d_%H%M%S"`
 
-#clean config_output_dir
-output_dir=${config_output_dir}
-SINGULARITY_BINDS="$SINGULARITY_BINDS -B $output_dir:$output_dir"
+#remove trailing / on directories
+output_dir=$(echo $config_output_dir | sed 's:/*$::')
+source_dir=$(echo $config_source_dir | sed 's:/*$::')
+
 
 #Run pipeline on cluster or locally
 if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
+  #create output dir
+  if [ -d "${output_dir}" ]
+    then
+      echo
+      echo "Output dir: ${output_dir}"
+    else
+      mkdir "${output_dir}"
+      echo
+      echo "Creating output dir: ${output_dir}"
+    fi
 
   #create log dir
   if [ -d "${output_dir}/log" ]
@@ -58,6 +62,15 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
     cp $f "${output_dir}/log/${log_time}_${strarr[-1]}"
   done
 
+  # copy workflow dir for archiving
+  if [ -d "${output_dir}/workflow" ]
+  then
+    cp "${source_dir}/workflow/Snakefile" "${output_dir}/workflow/${log_time}_Snakefile"
+  else
+    mkdir "${output_dir}/workflow"
+    cp "${source_dir}/workflow/Snakefile" "${output_dir}/workflow/${log_time}_Snakefile"
+  fi
+
   #submit jobs to cluster
   if [[ $pipeline = "cluster" ]]; then
     sbatch --job-name="RBL3" --gres=lscratch:200 --time=120:00:00 --output=${output_dir}/log/%j_%x.out --mail-type=BEGIN,END,FAIL \
@@ -65,31 +78,27 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
     --use-envmodules \
     --rerun-incomplete \
     --latency-wait 120 \
-    -s workflow/Snakefile \
-    --configfile ${output_dir}/log/${log_time}_snakemake_config.yaml \
-    --printshellcmds \
-    --cluster-config ${output_dir}/log/${log_time}_cluster_config.yml \
     --keep-going \
     --restart-times 1 \
+    --printshellcmds \
+    -s ${output_dir}/workflow/${log_time}_Snakefile \
+    --configfile ${output_dir}/log/${log_time}_snakemake_config.yaml \
+    --cluster-config ${output_dir}/log/${log_time}_cluster_config.yml \
     --cluster "sbatch --gres {cluster.gres} --cpus-per-task {cluster.threads} \
     -p {cluster.partition} -t {cluster.time} --mem {cluster.mem} \
     --job-name={params.rname} --output=${output_dir}/log/${s_time}_{params.rname}.out" \
-    -j 500 --rerun-incomplete \
-    --use-singularity \
-    --singularity-args "$SINGULARITY_BINDS"
+    -j 500
 
   #submit jobs locally
   else
     snakemake \
-      -s workflow/Snakefile \
       --use-envmodules \
-      --configfile ${output_dir}/log/${log_time}_snakemake_config.yaml \
-      --printshellcmds \
-      --cluster-config ${output_dir}/log/${log_time}_cluster_config.yml \
-      --cores 8 \
-      --use-singularity \
       --rerun-incomplete \
-      --singularity-args "$SINGULARITY_BINDS"
+      --printshellcmds \
+      --cores 8 \
+      -s ${output_dir}/workflow/${log_time}_Snakefile \
+      --configfile ${output_dir}/log/${log_time}_snakemake_config.yaml \
+      --cluster-config ${output_dir}/log/${log_time}_cluster_config.yml
   fi
 #Unlock pipeline
 elif [[ $pipeline = "unlock" ]]; then
