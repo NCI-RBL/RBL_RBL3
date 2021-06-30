@@ -32,19 +32,28 @@ num_match = config['number_of_matches']
 # functions
 ###############################################################
 #ref information
-def get_annotation_gtf(wildcards):
-    if({wildcards.masked_flag} == "masked"):
-        anno_gtf=config['annotation_gtf_masked']
-    else:
-        anno_gtf=config['annotation_gtf']
-    return(anno_gtf)
-
 def get_annotation_fa(wildcards):
-    if ({wildcards.masked_flag} == "masked"):
+    if (wildcards.masked_flag == "masked"):
         anno_fa=config['annotation_fa_masked']
     else:
         anno_fa=config['annotation_fa']
     return(anno_fa)
+
+#input for bam dependent on whether cleanup is run
+def get_bam_input(wildcards):
+    if (clean_up=="Y"):
+        bam_input = join(out_dir,'02_sam_corrected','{wildcards.bc}_{wildcards.masked_flag}.sorted_clean.sam')
+    else:
+        bam_input = join(out_dir,'02_sam','{wildcards.bc}_{wildcards.masked_flag}.sorted.sam')
+
+    return(bam_input)
+
+def get_annotation_gtf(wildcards):
+    if(wildcards.masked_flag == "masked"):
+        anno_gtf=config['annotation_gtf_masked']
+    else:
+        anno_gtf=config['annotation_gtf']
+    return(anno_gtf)
 
 #talon config
 def talon_config(wildcards):
@@ -104,14 +113,6 @@ else:
 df_deg = pd.read_csv(deg_manifest,sep=',')
 group_list = df_deg['group2']
 
-#input for bam dependent on whether cleanup is run
-def get_bam_input(wildcards):
-    if (clean_up=="Y"):
-        bam_input = join(out_dir,'02_sam_corrected','{wildcards.bc}.sorted_clean.sam')
-    else:
-        bam_input = join(out_dir,'02_sam','{wildcards.bc}.sorted.sam')
-
-    return(bam_input)
 
 ###############################################################
 # rule all
@@ -129,8 +130,8 @@ rule all:
         #sam files
         expand(join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam'),bc=bc_list, masked_flag=masked_list),
 
-        # #bam files
-        # expand(join(out_dir,'03_bam','{bc}.sorted.bam'),bc=bc_list),
+        #bam files
+        #expand(join(out_dir,'03_bam','{bc}_{masked_flag}.sorted.bam'),bc=bc_list, masked_flag=masked_list),
 
         # #qc
         # expand(join(out_dir, '04_qc','fastqc','{bc}_fastqc.html'),bc=bc_list),
@@ -234,8 +235,8 @@ rule create_sam:
     shell:
         '''
         minimap2 \
-            -ax splice -t 30 --secondary=no --MD \
-            {params.fa} {input.f1} > {output.sam};
+        -ax splice -t 30 --secondary=no --MD \
+        {params.fa} {input.f1} > {output.sam};
         samtools sort {output.sam} -o {output.sorted}
         '''
 
@@ -247,18 +248,18 @@ if (clean_up=="Y"):
         Corrects mismatches, microindels, and noncanonical splice junctions in long reads that have been mapped to the genome 
         '''
         input:
-            f1 = join(out_dir,'02_sam','{bc}.sorted.sam')
+            f1 = join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam')
         params:
             rname = "02_sam_corrected",
             sing_param = singularity_parameter, 
             doc = talon_conda,
             anno_fa = get_annotation_fa,
-            base = join(out_dir,'02_sam_corrected','{bc}.sorted'),
-            tmp = join(out_dir,'02_sam_corrected','tmp_{bc}'),    
+            base = join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted'),
+            tmp = join(out_dir,'02_sam_corrected','tmp_{bc}_{masked_flag}'),    
         envmodules:
             config['singularity'],
         output:
-            o1 = join(out_dir,'02_sam_corrected','{bc}.sorted_clean.sam')
+            o1 = join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted_clean.sam')
         shell:
             '''
             mkdir {params.tmp}; \
@@ -274,8 +275,8 @@ rule create_bam:
     envmodules:
         config['samtools']
     output:
-        bam = join(out_dir,'03_bam','{bc}.bam'),
-        sorted = join(out_dir, '03_bam','{bc}.sorted.bam')
+        bam = join(out_dir,'03_bam','{bc}_{masked_flag}.bam'),
+        sorted = join(out_dir, '03_bam','{bc}_{masked_flag}.sorted.bam')
     shell:
         """
         samtools view -bS {input.f1} -o {output.bam}; \
