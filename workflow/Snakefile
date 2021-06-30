@@ -10,7 +10,7 @@ fastq_dir = config['fastq_dir'].rstrip('/') + '/'
 sample_manifest=config['sample_manifest']
 deg_manifest = config['deg_manifest']
 
-singularity_parameter = 'singularity exec -B /data/,/fdb/,/scratch/,' + out_dir
+singularity_parameter = 'singularity exec -B /data,/fdb,/scratch,' + out_dir + ',' + source_dir
 talon_conda = config['conda_dir'] + config['talon_conda']
 porechop_conda = config['conda_dir'] + config['porechop_conda']
 flair_conda = config['conda_dir'] + config['flair_conda']
