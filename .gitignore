@@ -134,16 +134,17 @@ dependencies/
 tutorial/
 talon_tmp/
 
+# remove test_dir
+test_data
+
 #remove unneded dir
 *.DS_Store
 *.Rproj*
 *.snakemake/
 .Rproj.user
 kopardevn_dir_bash_history/
-workflow/scripts/.Rhistory
-workflow/scripts/._RBL3.Rmd
-*.v2*
-*.Rmd
+*.Rhistory
+*._*
 .kopardevn_dir_bash_history
 analysis/
 config/.kopardevn_dir_bash_history
