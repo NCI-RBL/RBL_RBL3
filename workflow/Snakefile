@@ -28,6 +28,9 @@ primer_len=config['primer_length']
 perc_sim = config['percent_similarity']
 num_match = config['number_of_matches']
 
+###############################################################
+# functions
+###############################################################
 #ref information
 def get_annotation_gtf(wildcards):
     if({wildcards.masked_flag} == "masked"):
@@ -42,16 +45,6 @@ def get_annotation_fa(wildcards):
     else:
         anno_fa=config['annotation_fa']
     return(anno_fa)
-
-#masked list
-if (masked_refs =="Y"):
-    masked_list=["masked","unmasked"]
-else:
-    masked_list=["unmasked"]
-
-#barcode list
-df_sample = pd.read_csv(sample_manifest,sep="\t")
-bc_list = df_sample['filename']
 
 #talon config
 def talon_config(wildcards):
@@ -94,6 +87,19 @@ def flair_config(wildcards):
         for line in config_data:
             txt_file.write(line + "\n")
 
+###############################################################
+# main code
+###############################################################
+#barcode list
+df_sample = pd.read_csv(sample_manifest,sep="\t")
+bc_list = df_sample['filename']
+
+#masked list
+if (masked_refs =="Y"):
+    masked_list=["masked","unmasked"]
+else:
+    masked_list=["unmasked"]
+
 #deg manifest
 df_deg = pd.read_csv(deg_manifest,sep=',')
 group_list = df_deg['group2']
@@ -107,7 +113,9 @@ def get_bam_input(wildcards):
 
     return(bam_input)
 
-
+###############################################################
+# rule all
+###############################################################
 #local rules
 localrules: talon_config, flair_config
 
@@ -119,7 +127,7 @@ rule all:
         expand(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'),bc=bc_list),
 
         #sam files
-        #expand(join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam'),bc=bc_list, masked_flag=masked_list),
+        expand(join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam'),bc=bc_list, masked_flag=masked_list),
 
         # #bam files
         # expand(join(out_dir,'03_bam','{bc}.sorted.bam'),bc=bc_list),
@@ -167,6 +175,9 @@ if source_dir == "":
 else:
     include: join(source_dir,"workflow/rules/common.smk")
 
+###############################################################
+# snakemake rules
+###############################################################
 rule handle_fastq:
     '''
     move and zip fastq files 
