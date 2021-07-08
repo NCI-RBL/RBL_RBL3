@@ -42,9 +42,9 @@ def get_annotation_fa(wildcards):
 #input for bam dependent on whether cleanup is run
 def get_bam_input(wildcards):
     if (clean_up=="Y"):
-        bam_input = join(out_dir,'02_sam_corrected','{wildcards.bc}_{wildcards.masked_flag}.sorted_clean.sam')
+        bam_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_' + wildcards.masked_flag + '.sorted_clean.sam')
     else:
-        bam_input = join(out_dir,'02_sam','{wildcards.bc}_{wildcards.masked_flag}.sorted.sam')
+        bam_input = join(out_dir,'02_sam', wildcards.bc + '_' + wildcards.masked_flag + '.sorted.sam')
 
     return(bam_input)
 
@@ -120,6 +120,12 @@ group_list = df_deg['group2']
 #local rules
 localrules: talon_config, flair_config
 
+if clean_up=="Y":
+    input_sam = [expand(join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam'),bc=bc_list, masked_flag=masked_list),
+                expand(join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted_clean.sam'),bc=bc_list, masked_flag=masked_list)]
+else:
+    input_sam = [expand(join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam'),bc=bc_list, masked_flag=masked_list)]
+
 rule all:
     input:
         #input fastq files
@@ -128,16 +134,16 @@ rule all:
         expand(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'),bc=bc_list),
 
         #sam files
-        expand(join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam'),bc=bc_list, masked_flag=masked_list),
+        input_sam,
 
         #bam files
-        #expand(join(out_dir,'03_bam','{bc}_{masked_flag}.sorted.bam'),bc=bc_list, masked_flag=masked_list),
+        expand(join(out_dir,'03_bam','{bc}_{masked_flag}.sorted.bam'),bc=bc_list, masked_flag=masked_list),
 
-        # #qc
-        # expand(join(out_dir, '04_qc','fastqc','{bc}_fastqc.html'),bc=bc_list),
-        # expand(join(out_dir, '04_qc','samtools','{bc}_samstats.txt'),bc=bc_list),
-        # join(out_dir,'07_report','multiqc_report.html'),
-        # join(out_dir,'07_report','qc_report.html'),
+        #qc
+        #expand(join(out_dir, '04_qc','fastqc','{bc}_{masked_flag}_fastqc.html'), masked_flag=masked_list),
+        #expand(join(out_dir, '04_qc','samtools','{bc}_{masked_flag}_samstats.txt'), masked_flag=masked_list),
+        #join(out_dir,'07_report','multiqc_report.html'),
+        #join(out_dir,'07_report','qc_report.html'),
 
         # #talon
         # join(out_dir,'05_talon', 'talon_config.csv'),
@@ -262,9 +268,9 @@ if (clean_up=="Y"):
             o1 = join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted_clean.sam')
         shell:
             '''
-            mkdir {params.tmp}; \
-            {params.sing_param} {params.doc} TranscriptClean.py --sam={input.f1} --genome={params.anno_fa} \
-                --tmpDir={params.tmp} --outprefix={params.base} --deleteTmp
+            if [ ! -d {params.tmp} ];then mkdir {params.tmp};fi
+            {params.sing_param},{params.anno_fa} {params.doc} TranscriptClean.py --sam {input.f1} --genome {params.anno_fa} \
+            --tmpDir {params.tmp} --outprefix {params.base} --deleteTmp
             '''
 
 rule create_bam:
@@ -289,7 +295,7 @@ rule qc_fastq:
     Runs FastQC report on each sample 
     """
     input:
-        bam = join(out_dir, '03_bam','{bc}.sorted.bam'),
+        bam = join(out_dir, '03_bam','{bc}_{masked_flag}.sorted.bam'),
         fq = join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz')
     params:
         rname='04_fqc',
@@ -297,7 +303,7 @@ rule qc_fastq:
     envmodules:
         config['fastqc']
     output:
-        o1 = join(out_dir, '04_qc','fastqc','{bc}_fastqc.html')
+        o1 = join(out_dir, '04_qc','fastqc','{bc}_{masked_flag}_fastqc.html')
     shell:
         """
         fastqc {input.fq} -o {params.base}
@@ -328,8 +334,8 @@ rule qc_multiqc:
     https://multiqc.info/docs/#running-multiqc
     """
     input:
-        f1 = expand(join(out_dir, '04_qc', 'fastqc','{bc}_fastqc.html'),bc=bc_list),
-        f2 = expand(join(out_dir, '04_qc', 'samtools','{bc}_samstats.txt'),bc=bc_list)
+        f1 = expand(join(out_dir, '04_qc', 'fastqc','{bc}_{masked_flag}_fastqc.html'),bc=bc_list, masked_flag=masked_list),
+        f2 = expand(join(out_dir, '04_qc', 'samtools','{bc}_{masked_flag}_samstats.txt'),bc=bc_list, masked_flag=masked_list)
     params:
         rname = '04_multiqc',
         out = join(out_dir,'07_report'),
@@ -342,94 +348,69 @@ rule qc_multiqc:
     shell:
         """
         multiqc -f -v -c {params.qc_config} \
-            -d -dd 1 {params.dir_fastq} \
-            -o {params.out}
+        -d -dd 1 {params.dir_fastq} \
+        -o {params.out}
         """
 
-if (masked_refs=="Y"):
-    rule qc_alignment:
+rule qc_alignment:
+    """
+    uses samtools to create a bams of unaligned reads and aligned reads
+    input; print qlength col to text file
+    generates plots and summmary file for aligned vs unaligned statistics
+    """
+    input:
+        f1 = join(out_dir, '03_bam','{bc}_{masked_flag}.sorted.bam')
+    params:
+        rname = "04_qc_align",
+        R = join(source_dir,'workflow','scripts','alignment_stats.R'),
+        base = join(out_dir, '04_qc', 'alignment/')
+    envmodules:
+        config['samtools'],
+        config['R']
+    output:
+        bam_a = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_align_len.txt'),
+        bam_u = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unalign_len.txt'),
+        png_align = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_aligned.png'),
+        png_unalign = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unaligned.png'),
+        txt_align = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_aligned.txt'),
+        txt_unalign = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unaligned.txt'),
+    shell:
         """
-        uses samtools to create a bams of unaligned reads and aligned reads
-        input; print qlength col to text file
-        generates plots and summmary file for aligned vs unaligned statistics
+        samtools view -F 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_a}; \
+        samtools view -f 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_u}; \
+        Rscript {params.R} {wildcards.bc} {output.bam_a} {output.bam_u} {params.base}
+        """
+
+if (masked_refs == "Y"):
+    rule qc_troubleshoot:
+        """
+        generates a PDF of barcode plots and alignment plots for qc troubleshooting
         """
         input:
-            f1 = join(out_dir, '03_bam','{bc}.sorted.bam')
+            png_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_aligned.png'), bc=bc_list, masked_flag=masked_list),
+            png_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unaligned.png'), bc=bc_list, masked_flag=masked_list),
+            txt_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_aligned.txt'), bc=bc_list, masked_flag=masked_list),
+            txt_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unaligned.txt'), bc=bc_list, masked_flag=masked_list),
         params:
-            rname = "04_qc_align",
-            R = join(source_dir,'workflow','scripts','alignment_stats.R'),
-            base = join(out_dir, '04_qc', 'alignment/')
+            rname = "04_qc_report",
+            png_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_masked_aligned.png'), bc=bc_list),
+            png_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_masked_unaligned.png'), bc=bc_list),
+            txt_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_masked_aligned.txt'), bc=bc_list),
+            txt_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_masked_unaligned.txt'), bc=bc_list),
+            R = join(source_dir,'workflow','scripts','02_qc_report_comparemasking.Rmd'),
         envmodules:
-            config['samtools'],
             config['R']
         output:
-            bam_a = join(out_dir, '04_qc', 'alignment','{bc}_align_len.txt'),
-            bam_u = join(out_dir, '04_qc', 'alignment','{bc}_unalign_len.txt'),
-            png_align = join(out_dir, '04_qc', 'alignment','{bc}_aligned.png'),
-            png_unalign = join(out_dir, '04_qc', 'alignment','{bc}_unaligned.png'),
-            txt_align = join(out_dir, '04_qc', 'alignment','{bc}_aligned.txt'),
-            txt_unalign = join(out_dir, '04_qc', 'alignment','{bc}_unaligned.txt'),
+            o1 = join(out_dir,'07_report','qc_report.html')
         shell:
             """
-            samtools view -F 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_a}; \
-            samtools view -f 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_u}; \
-            Rscript {params.R} {wildcards.bc} {output.bam_a} {output.bam_u} {params.base}
+            Rscript -e 'library(rmarkdown); \
+            rmarkdown::render("{params.R}",
+                output_file = "{output.o1}", \
+                params= list(a_txt = "{input.txt_align}", \
+                u_txt = "{input.txt_unalign}"))'
             """
-
-    rule qc_troubleshoot:
-            """
-            generates a PDF of barcode plots and alignment plots for qc troubleshooting
-            """
-            input:
-                png_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_aligned.png'), bc=bc_list),
-                png_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_unaligned.png'), bc=bc_list),
-                txt_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_aligned.txt'), bc=bc_list),
-                txt_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_unaligned.txt'), bc=bc_list),
-            params:
-                rname = "04_qc_report",
-                R = join(source_dir,'workflow','scripts','qc_report_nondemux.Rmd'),
-            envmodules:
-                config['R']
-            output:
-                o1 = join(out_dir,'07_report','qc_report.html')
-            shell:
-                """
-                Rscript -e 'library(rmarkdown); \
-                rmarkdown::render("{params.R}",
-                    output_file = "{output.o1}", \
-                    params= list(a_txt = "{input.txt_align}", \
-                        u_txt = "{input.txt_unalign}"))'
-                """
 else:
-    rule qc_alignment:
-        """
-        uses samtools to create a bams of unaligned reads and aligned reads
-        input; print qlength col to text file
-        generates plots and summmary file for aligned vs unaligned statistics
-        """
-        input:
-            f1 = join(out_dir, '03_bam','{bc}.sorted.bam')
-        params:
-            rname = "04_qc_align",
-            R = join(source_dir,'workflow','scripts','alignment_stats.R'),
-            base = join(out_dir, '04_qc', 'alignment/')
-        envmodules:
-            config['samtools'],
-            config['R']
-        output:
-            bam_a = join(out_dir, '04_qc', 'alignment','{bc}_align_len.txt'),
-            bam_u = join(out_dir, '04_qc', 'alignment','{bc}_unalign_len.txt'),
-            png_align = join(out_dir, '04_qc', 'alignment','{bc}_aligned.png'),
-            png_unalign = join(out_dir, '04_qc', 'alignment','{bc}_unaligned.png'),
-            txt_align = join(out_dir, '04_qc', 'alignment','{bc}_aligned.txt'),
-            txt_unalign = join(out_dir, '04_qc', 'alignment','{bc}_unaligned.txt'),
-        shell:
-            """
-            samtools view -F 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_a}; \
-            samtools view -f 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_u}; \
-            Rscript {params.R} {wildcards.bc} {output.bam_a} {output.bam_u} {params.base}
-            """
-
     rule qc_troubleshoot:
             """
             generates a PDF of barcode plots and alignment plots for qc troubleshooting
@@ -441,7 +422,7 @@ else:
                 txt_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_unaligned.txt'), bc=bc_list),
             params:
                 rname = "04_qc_report",
-                R = join(source_dir,'workflow','scripts','qc_report_nondemux.Rmd'),
+                R = join(source_dir,'workflow','scripts','02_qc_report_unmasked.Rmd'),
             envmodules:
                 config['R']
             output:
@@ -454,7 +435,6 @@ else:
                     params= list(a_txt = "{input.txt_align}", \
                         u_txt = "{input.txt_unalign}"))'
                 """
-
 
 rule talon_config:
     '''
@@ -493,6 +473,21 @@ rule talon_db:
             --o {params.base}
         '''
 
+
+#input for talon_prime dependent on whether cleanup is run -  will only run masked if that is present
+def get_talon_input(wildcards):
+    if (clean_up=="Y"):
+        if (masked_refs=="unmasked"):
+            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_unmasked.sorted_clean.sam')
+        else:
+            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_masked.sorted_clean.sam')
+    else:
+        if (masked_refs=="unmasked"):
+            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_unmasked.sorted.sam')
+        else:
+            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_masked.sorted.sam')
+    return(talon_input)
+
 rule talon_prime:
     '''
     Current long-read platforms that rely on poly-(A) selection are prone to internal priming artifacts. 
@@ -507,7 +502,7 @@ rule talon_prime:
     --deleteTmp
     '''
     input:
-        f1 = join(out_dir,'02_sam_corrected','{bc}.sorted_clean.sam'),
+        f1 = get_talon_input
     params:
         rname = "05.2_sam_label",
         sing_param = singularity_parameter, 
@@ -854,7 +849,7 @@ rule abundance_plots:
         flair = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv')
     params:
         rname = "07_abundance_plots",
-        R = join(source_dir,"workflow","scripts","transcript_types.Rmd"),
+        R = join(source_dir,"workflow","scripts","03_transcript_types.Rmd"),
         base = join(out_dir,'07_report'),
         perc_sim = perc_sim,
         num_match = num_match
