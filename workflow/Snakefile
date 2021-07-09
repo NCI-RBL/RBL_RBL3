@@ -2,6 +2,7 @@ from os.path import join
 import pandas as pd
 from collections import defaultdict
 import yaml
+import csv
 
 #config dir
 source_dir = config['source_dir']
@@ -64,7 +65,23 @@ def get_annotation_gtf(wildcards):
         anno_gtf=config['annotation_gtf']
     return(anno_gtf)
 
-import csv
+#set input for talon gtf
+def get_annotation_gtf_talon(wildcards):
+    if(masked_refs == "Y"):
+        anno_gtf=config['annotation_gtf_masked']
+    else:
+        anno_gtf=config['annotation_gtf']
+    return(anno_gtf)
+
+def get_annotation_name_talon(wildcards):
+    if(masked_refs == "Y"):
+        anno_fa=config['annotation_fa_masked']
+    else:
+        anno_fa=config['annotation_fa']
+    
+    anno_fa=anno_fa.rsplit('/', 1)[-1]
+    return(anno_fa)
+
 def get_deg_list():
     list_path=deg_manifest
     
@@ -190,11 +207,11 @@ rule all:
         join(out_dir,'04_qc','multiqc_report.html'),
         expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_align_len.txt'), bc=bc_list, masked_flag=masked_list),
         join(out_dir,'04_qc','qc_report.html'),
-
-        # #talon
+        
+        #talon
         join(out_dir,'05_talon', 'talon_config.csv'),
         join(out_dir,'05_talon', build_id + '.db'),
-        #expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
+        expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
         # join(out_dir,'05_talon','annotate', build_id + '_talon_read_annot.tsv'),
         # join(out_dir,'05_talon','counts', build_id + '_talon_summary.tsv'),
         # join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
@@ -500,7 +517,7 @@ rule talon_db:
     initialize db
     '''
     input:
-        anno = get_annotation_gtf,
+        anno = get_annotation_gtf_talon,
     params:
         rname = "05.1_talon_db",
         sing_param = singularity_parameter, 
@@ -508,14 +525,18 @@ rule talon_db:
         a_id = annotation_id,
         b_id = build_id,
         base = join(out_dir,'05_talon',build_id),
+        anno_name = get_annotation_name_talon,
+        tmp_dir = join(out_dir,'05_talon','tmp')
     output:
         o1 = join(out_dir,'05_talon',build_id + '.db')
     envmodules:
         config['singularity'],
     shell:
         '''
+        if [ -w "/lscratch/${{SLURM_JOB_ID}}" ];then tmpdir="/lscratch/${{SLURM_JOB_ID}}";else tmpdir={params.tmp_dir}; mkdir ${{tmpdir}};fi
+        cp {input.anno} "${{tmpdir}}/{params.anno_name}";
         {params.sing_param} {params.doc} talon_initialize_database \
-            --f {input.anno} \
+            --f "${{tmpdir}}/{params.anno_name}" \
             --a {params.a_id}\
             --g {params.b_id} \
             --o {params.base}
@@ -540,7 +561,7 @@ rule talon_prime:
         rname = "05.2_sam_label",
         sing_param = singularity_parameter, 
         doc = talon_conda,
-        anno = get_annotation_path,
+        anno = get_annotation_gtf_talon,
         base_tmp = join(out_dir,'tmp' + '_' + '{bc}'),
         base_sample = join(out_dir,'05_talon','sam_labeled','{bc}'),
         p_len = primer_len, 
