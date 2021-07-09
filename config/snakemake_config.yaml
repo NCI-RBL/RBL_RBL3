@@ -1,17 +1,16 @@
 # Global configuration file for the pipeline
 #path to rbl3 directory
-source_dir: "/data/CCBR/projects/rbl3/"
+source_dir: "/path/to/rbl3/repo/"
 
 #path to output directory
-output_dir: "/scratch/sevillas2/rbl3_test"
+output_dir: "/path/to/output/dir/"
 
 #path to manifest files
-sample_manifest: "/data/CCBR/projects/rbl3/manifest/sample.tsv"
-deg_manifest: "/data/CCBR/projects/rbl3/manifest/deg_manifest.txt"
+sample_manifest: "/path/to/sample_manifest.tsv"
+deg_manifest: "/path/to/deg_manifest.tsv"
 
 #path to fastq files
-#fastq_dir: "/data/RBL_NCI/Gu/chunmei/nanopore/fastq_pass"
-fastq_dir: "/data/RBL_NCI/Gu/chunmei/nanopore_rawfastqs/"
+fastq_dir: "/path/to/fastq_files"
 
 #user parameters
 masked_reference: "Y" #if a masked reference file (see below) should be used indicate "Y"
