@@ -1,0 +1,177 @@
+---
+output: html_document
+params:
+  f_talon_data: 
+    value: "~/../../Volumes/sevillas2-1/rbl3_final/05_talon/counts/SIRV_talon_abundance_filtered.tsv"
+  u_talon_data: 
+    value: "~/../../Volumes/sevillas2-1/rbl3_final/05_talon/counts/SIRV_talon_abundance.tsv"
+  u_flair_data: 
+    value: "~/../../Volumes/sevillas2-1/rbl3_final/06_flair/counts/flair_counts_matrix.tsv"
+  output_dir:
+    value: "~/../../Volumes/sevillas2-1/rbl3_final/07_report"
+  perc_sim:
+    value: 20
+  num_match:
+    value: 5
+editor_options: 
+  chunk_output_type: console
+---
+
+# Project: Drosha regulates mRNA splicing or decay
+* Description (from PI)
+  * The project is to investigate Drosha-regulated genes and the mRNA splicing pattern in Drosha-KO.
+  * I have wildtype cells and Drosha-KO, Dicer-KO, DGCR8-KO, Drosha-Dicer-DKO and DGCR8-Dicer-DKO cells. I would like to check which genes are regulated by Drosha, and whether Drosha will change the mRNA splicing pattern using Nanopore mRNA-seq.
+  * Specifically, I would like to check whether Drosha regulates IGF2 by mRNA decay or alternative splicing. Thus, my question is: can I use Nanopore to detect the mRNA decay and alternative splicing by using a bioinformatics approach?
+
+# Analysis Workflow
+* Adapters are trimmed from FASTQ files with [porechop](https://github.com/rrwick/Porechop)
+* Sam files are corrected for mismatches, microindels, and noncanonical splice junctions in long reads that have been mapped to the genome with [TranscriptClean](https://github.com/mortazavilab/TranscriptClean)
+* QC is performed on FASTQ files with [FASTQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) and on BAM files with [SAMTOOLS](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
+* [TALON](https://github.com/mortazavilab/TALON) workflow is performed including read priming, abundance counts of transcripts, filtering transcripts and summarizing transcripts before and after filtering. See output summaries below.
+* [FLAIR](https://github.com/BrooksLabUCSC/flair#modules) workflow is performed. See partial summaries below, complete pipeline still in progress.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(ggpubr)
+library(reshape2)
+library(knitr)
+library(stringr)
+
+#references
+#https://www.biorxiv.org/content/10.1101/672931v2.supplementary-material
+```
+
+```{r Params, echo=FALSE}
+talon_filtered_data = params$f_talon_data
+talon_unfiltered_data = params$u_talon_data
+flair_data = params$u_flair_data
+out_dir = params$output_dir
+```
+
+```{r, echo=FALSE}
+#plot transcript read lengths, read counts, exon counts
+TranscriptFeatures <- function(df_in,title_in,type_in) {
+  abund_df = read.csv(df_in,sep="\t")
+  
+  p1 = ggplot(abund_df, aes(x=transcript_novelty, y=length, fill=transcript_novelty)) + 
+    geom_violin(trim=FALSE)+
+    geom_boxplot(width=0.1, fill="white")+
+    labs(title="Plot of read length \n\n",
+         x="Transcript type", y = "Read Length")+
+    scale_fill_brewer(palette="Dark2") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_y_continuous(trans = 'log10')
+  
+  p2 = ggplot(abund_df, aes(x=transcript_novelty, y=n_exons, fill=transcript_novelty)) + 
+    geom_violin(trim=FALSE)+
+    geom_boxplot(width=0.1, fill="white")+
+    labs(title="Plot of number of exons \n\n",
+         x="Transcript Type", y = "Number of Exons") +
+    scale_fill_brewer(palette="Dark2") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_y_continuous(trans = 'log10')
+
+  #aggregate by type
+  transcript_nov = aggregate(get(colnames(abund_df[12]))~transcript_novelty,abund_df,sum)
+  colnames(transcript_nov)[2] <- colnames(abund_df[12])
+  
+  for (i in range(13:ncol(abund_df))){
+    transcript_nov[,colnames(abund_df[i])] = aggregate(get(colnames(abund_df[i]))
+                                                           ~transcript_novelty,abund_df,sum)[2]
+    
+  }                      
+  
+  #melt and plot
+  dfm <- melt(transcript_nov[,c('transcript_novelty',
+                                colnames(abund_df)[12:ncol(abund_df)])],
+              id.vars = 1)
+
+  p3 = ggplot(dfm,aes(x = transcript_novelty,y = value)) + 
+      geom_bar(aes(fill = variable),stat = "identity",position = "dodge") + 
+    labs(y="Read Counts", fill = "sample_id") + 
+    ggtitle("Plot of read counts \n\n") +
+    scale_fill_brewer(palette="Dark2") + theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    scale_y_continuous(trans = 'log10') 
+
+  p4 = ggparagraph(
+    paste0("\n\n\n",title_in),
+    color = NULL,
+    size = 20,
+    face = "bold",
+    family = NULL,
+    lineheight = NULL
+  )
+  
+  #plot
+  p_final = ggarrange(p1, p2, p3, p4,
+            labels = c("A", "B", "C"),
+            ncol = 2, nrow = 2)
+    
+  print(p_final)
+  
+  #save plot
+  ggsave(paste0(out_dir,"/",type_in,".png"),p_final)
+} 
+```
+
+## Transcript Type
+### Talon data
+ **TALON identified transcripts are summarized prior to filtering by type, with the following key:**
+
+* ISM: incomplete splice match
+
+* NIC: novel in catalog
+
+* NNC: novel not in catalog
+
+Two files are generated, including:
+
+* A counts matrix was created, located at ```r talon_unfiltered_data```, which is previewed below:
+```{r, echo=FALSE, message=FALSE}
+#text files
+talon_df = read.csv(talon_unfiltered_data,sep="\t")
+kable(head(talon_df))
+```
+
+* A transcript summary was generated from this unfiltered data, log10 transformed:
+```{r, echo=FALSE, message=FALSE}
+#png files
+TranscriptFeatures(talon_unfiltered_data,"    Unfiltered Data","unfiltered_abundance")
+```
+
+ **TALON identified transcripts are then filtered based on the following criteria**
+
+1. transcripts are known OR
+
+2. reads must have <``r params$perc_sim``% A in the 20bp interval after alignment AND be detected at least ``r params$num_match`` times in both replicates
+
+Two files are generated, including:
+
+* A counts matrix was created, located at ```r talon_filtered_data```, which is previewed below:
+```{r, echo=FALSE, message=FALSE}
+#text files
+talon_df = read.csv(talon_filtered_data,sep="\t")
+kable(head(talon_df))
+```
+
+* A transcript summary was generated from this filtered data, log10 transformed:
+```{r, echo=FALSE, message=FALSE}
+TranscriptFeatures(talon_filtered_data,"     Filtered Data","filtered_abundance")
+```
+
+### Flair data
+ **Flair identified transcripts are summarized prior to DEG:**
+ 
+Two files are generated, including:
+
+* A counts matrix was created, located at ```r flair_data```, which is previewed below:
+```{r, echo=FALSE, message=FALSE}
+#text files
+flair_df = read.csv(flair_data,sep="\t")
+i=2
+for (colid in colnames(flair_df)[2:ncol(flair_df)]){
+  colnames(flair_df)[i] <- str_split(colid, "_")[[1]][[1]]
+  i= i+1
+}
+kable(head(flair_df))
+```

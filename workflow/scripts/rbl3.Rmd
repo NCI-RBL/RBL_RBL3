@@ -1,0 +1,112 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r}
+suppressMessages(library(dplyr))
+suppressMessages(library(VennDiagram))
+
+```
+
+#file dir
+```{r}
+counts_flair="flair_counts_matrix.tsv"
+counts_talon="SIRV_talon_abundance_filtered.tsv"
+
+analysis_dir = "venndiagrams/"
+```
+
+#handle counts input
+```{r}
+talon_df=read.csv(counts_talon,sep="\t")
+
+head(flair_df)
+head(talon_df)
+
+#flair df
+flair_df=read.csv(counts_flair,sep="\t")
+flair_df$annot_gene_id = as.character(lapply(flair_df$ids,function(x){strsplit(x,"_",fixed=TRUE)[[1]][[2]]}))
+flair_df = flair_df %>% 
+  dplyr::rename(
+    wt = wt_wt_b1,
+    ko_drosha = ko.drosha_ko.drosha_b1,
+    ko_dicer = ko.dicer_ko.dicer_b1
+  )
+head(flair_df)
+```
+
+#venn diagram
+```{r}
+####################################################################################
+# Functions
+####################################################################################
+
+#create unique list of genes
+create_gene_list <- function(col_select, df_in,type, df_type, novel_included="Y"){
+  gene_list = subset(df_in,get(col_select) > 0)$annot_gene_id
+  
+  if(novel_included=="N"){
+    gene_list = gene_list[grepl("ENSG",gene_list)]
+  }
+  
+  print(paste0("Number of total ", df_type, " values in ", type, ": ", length(gene_list)))
+  print(paste0("Number of unique ", df_type, " values in ", type, ": ", length(unique(gene_list))))
+  return(unique(gene_list))
+}
+
+#generates venn diagram from list inputs
+GenerateVennD <- function(list1,list2,list.names,list.cols,title.in,fname){
+  
+  venn.diagram(
+    #create venn
+    x=list(list1,list2),
+    category.names = list.names,
+    fill=list.cols,
+    
+    #title
+    main=title.in,
+    main.cex = 2,
+    
+    #output
+    filename = fname,
+    output=TRUE,
+  )
+}
+
+####################################################################################
+# Functions
+####################################################################################
+type_list = c("wt", "ko_drosha", "ko_dicer")
+
+for (type in type_list){
+  #generate gene lists for each feature
+  talon_list = create_gene_list(type, talon_df, type, "TALON")
+  flair_list = create_gene_list(type, flair_df, type, "FLAIR")
+  
+  #create venn diagrams to visualize
+  file.save = paste0(analysis_dir,"venndiagram_",type,".png")
+  color.list =  c("light blue", "pink")
+  venn.title = paste0("TALON vs FLAIR Abundance Counts\n",type)
+  GenerateVennD(talon_list,flair_list,c("TALON","FLAIR"),color.list,venn.title,file.save)
+}
+  
+
+#repeat filtering transcripts without location in flair
+for (type in type_list){
+  #generate gene lists for each feature
+  talon_list = create_gene_list(type, talon_df, type, "TALON")
+  flair_list = create_gene_list(type, flair_df, type, "FLAIR","N")
+  
+  #create venn diagrams to visualize
+  file.save = paste0(analysis_dir,"venndiagram_filt_",type,".png")
+  color.list =  c("light blue", "pink")
+  venn.title = paste0("TALON vs FLAIR Abundance Counts\n",type)
+  GenerateVennD(talon_list,flair_list,c("TALON","FLAIR"),color.list,venn.title,file.save)
+}
+
+```
+
