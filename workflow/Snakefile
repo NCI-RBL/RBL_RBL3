@@ -10,7 +10,7 @@ fastq_dir = config['fastq_dir'].rstrip('/') + '/'
 sample_manifest=config['sample_manifest']
 deg_manifest = config['deg_manifest']
 
-singularity_parameter = 'singularity exec -B /data,/fdb,/scratch,' + out_dir + ',' + source_dir
+singularity_parameter = 'singularity exec -B /data,/fdb,/scratch,/lscratch,' + out_dir + ',' + source_dir
 talon_conda = config['conda_dir'] + config['talon_conda']
 porechop_conda = config['conda_dir'] + config['porechop_conda']
 flair_conda = config['conda_dir'] + config['flair_conda']
@@ -32,11 +32,20 @@ num_match = config['number_of_matches']
 # functions
 ###############################################################
 #ref information
-def get_annotation_fa(wildcards):
+def get_annotation_path(wildcards):
     if (wildcards.masked_flag == "masked"):
         anno_fa=config['annotation_fa_masked']
     else:
         anno_fa=config['annotation_fa']
+    return(anno_fa)
+
+def get_annotation_name(wildcards):
+    if (wildcards.masked_flag == "masked"):
+        anno_fa=config['annotation_fa_masked']
+    else:
+        anno_fa=config['annotation_fa']
+    
+    anno_fa=anno_fa.rsplit('/', 1)[-1]
     return(anno_fa)
 
 #input for bam dependent on whether cleanup is run
@@ -54,6 +63,31 @@ def get_annotation_gtf(wildcards):
     else:
         anno_gtf=config['annotation_gtf']
     return(anno_gtf)
+
+import csv
+def get_deg_list():
+    list_path=deg_manifest
+    
+    #read file
+    with open(list_path) as f:
+        reader = csv.reader(f, delimiter="\t")
+        deg_file = list(reader)
+
+        #for each group in deg list
+        deg_list=[]
+        for group in deg_file:
+            
+            #for each individual id
+            for id in group:
+                id = id.replace("  ", "_")
+            
+            #append final list
+            deg_list.append(id)
+        
+        #remove header
+        deg_list.pop(0)
+
+    return(deg_list)
 
 #talon config
 def talon_config(wildcards):
@@ -96,6 +130,19 @@ def flair_config(wildcards):
         for line in config_data:
             txt_file.write(line + "\n")
 
+#input for talon_prime dependent on whether cleanup is run -  will only run masked if that is present
+def get_talon_input(wildcards):
+    if (clean_up=="Y"):
+        if (masked_refs=="unmasked"):
+            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_unmasked.sorted_clean.sam')
+        else:
+            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_masked.sorted_clean.sam')
+    else:
+        if (masked_refs=="unmasked"):
+            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_unmasked.sorted.sam')
+        else:
+            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_masked.sorted.sam')
+    return(talon_input)
 ###############################################################
 # main code
 ###############################################################
@@ -110,9 +157,7 @@ else:
     masked_list=["unmasked"]
 
 #deg manifest
-df_deg = pd.read_csv(deg_manifest,sep=',')
-group_list = df_deg['group2']
-
+deg_list = get_deg_list()
 
 ###############################################################
 # rule all
@@ -140,15 +185,16 @@ rule all:
         expand(join(out_dir,'03_bam','{bc}_{masked_flag}.sorted.bam'),bc=bc_list, masked_flag=masked_list),
 
         #qc
-        #expand(join(out_dir, '04_qc','fastqc','{bc}_{masked_flag}_fastqc.html'), masked_flag=masked_list),
-        #expand(join(out_dir, '04_qc','samtools','{bc}_{masked_flag}_samstats.txt'), masked_flag=masked_list),
-        #join(out_dir,'07_report','multiqc_report.html'),
-        #join(out_dir,'07_report','qc_report.html'),
+        expand(join(out_dir, '04_qc','fastqc','{bc}_fastqc.html'), bc=bc_list),
+        expand(join(out_dir, '04_qc','samtools','{bc}_{masked_flag}_samstats.txt'), bc=bc_list, masked_flag=masked_list),
+        join(out_dir,'04_qc','multiqc_report.html'),
+        expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_align_len.txt'), bc=bc_list, masked_flag=masked_list),
+        join(out_dir,'04_qc','qc_report.html'),
 
         # #talon
-        # join(out_dir,'05_talon', 'talon_config.csv'),
-        # join(out_dir,'05_talon', build_id + '.db'),
-        # expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
+        join(out_dir,'05_talon', 'talon_config.csv'),
+        join(out_dir,'05_talon', build_id + '.db'),
+        #expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
         # join(out_dir,'05_talon','annotate', build_id + '_talon_read_annot.tsv'),
         # join(out_dir,'05_talon','counts', build_id + '_talon_summary.tsv'),
         # join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
@@ -162,7 +208,7 @@ rule all:
         # join(out_dir,'06_flair','flair_config.csv'),
         # expand(join(out_dir,'06_flair','fastq','{bc}.fastq'),bc=bc_list),
         # join(out_dir,'06_flair','counts','flair_counts_matrix.tsv'),
-        # # expand(join(out_dir,'06_flair','diff','diff_iso_{group_id}.txt'),group_id=group_list),
+        # # expand(join(out_dir,'09_flair','diff_iso_{group_id}.txt'),group_id=deg_list),
 
         # #report
         # join(out_dir,'07_report','summary_report.html'),
@@ -231,7 +277,7 @@ rule create_sam:
         f1 = join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz')
     params:
         rname = "02_sam",
-        fa = get_annotation_fa
+        fa = get_annotation_path
     envmodules:
         config['minimap2'],
         config['samtools']
@@ -259,18 +305,20 @@ if (clean_up=="Y"):
             rname = "02_sam_corrected",
             sing_param = singularity_parameter, 
             doc = talon_conda,
-            anno_fa = get_annotation_fa,
+            anno_fa_path = get_annotation_path,
+            anno_fa_name = get_annotation_name,
             base = join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted'),
-            tmp = join(out_dir,'02_sam_corrected','tmp_{bc}_{masked_flag}'),    
+            tmp_dir = join(out_dir,'02_sam_corrected','tmp_{bc}_{masked_flag}')
         envmodules:
             config['singularity'],
         output:
             o1 = join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted_clean.sam')
         shell:
             '''
-            if [ ! -d {params.tmp} ];then mkdir {params.tmp};fi
-            {params.sing_param},{params.anno_fa} {params.doc} TranscriptClean.py --sam {input.f1} --genome {params.anno_fa} \
-            --tmpDir {params.tmp} --outprefix {params.base} --deleteTmp
+            if [ -w "/lscratch/${{SLURM_JOB_ID}}" ];then tmpdir="/lscratch/${{SLURM_JOB_ID}}";else tmpdir={params.tmp_dir};fi
+            cp {params.anno_fa_path} "${{tmpdir}}/{params.anno_fa_name}";
+            {params.sing_param} {params.doc} TranscriptClean.py --sam {input.f1} --genome "${{tmpdir}}/{params.anno_fa_name}" \
+            --tmpDir $tmpdir --outprefix {params.base} --deleteTmp;
             '''
 
 rule create_bam:
@@ -295,7 +343,6 @@ rule qc_fastq:
     Runs FastQC report on each sample 
     """
     input:
-        bam = join(out_dir, '03_bam','{bc}_{masked_flag}.sorted.bam'),
         fq = join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz')
     params:
         rname='04_fqc',
@@ -303,7 +350,7 @@ rule qc_fastq:
     envmodules:
         config['fastqc']
     output:
-        o1 = join(out_dir, '04_qc','fastqc','{bc}_{masked_flag}_fastqc.html')
+        o1 = join(out_dir, '04_qc','fastqc','{bc}_fastqc.html')
     shell:
         """
         fastqc {input.fq} -o {params.base}
@@ -316,13 +363,13 @@ rule qc_samstats:
     > $1
     """
     input:
-        f1 = join(out_dir, '03_bam','{bc}.sorted.bam')
+        f1 = join(out_dir, '03_bam','{bc}_{masked_flag}.sorted.bam')
     params:
         rname='04_samstats'
     envmodules:
         config['samtools']
     output:
-        o1 = join(out_dir, '04_qc','samtools','{bc}_samstats.txt')
+        o1 = join(out_dir, '04_qc','samtools','{bc}_{masked_flag}_samstats.txt')
     shell:
         """
         samtools view -h {input.f1} | samtools stats - > {output.o1}
@@ -334,21 +381,22 @@ rule qc_multiqc:
     https://multiqc.info/docs/#running-multiqc
     """
     input:
-        f1 = expand(join(out_dir, '04_qc', 'fastqc','{bc}_{masked_flag}_fastqc.html'),bc=bc_list, masked_flag=masked_list),
+        f1 = expand(join(out_dir, '04_qc', 'fastqc','{bc}_fastqc.html'),bc=bc_list),
         f2 = expand(join(out_dir, '04_qc', 'samtools','{bc}_{masked_flag}_samstats.txt'),bc=bc_list, masked_flag=masked_list)
     params:
         rname = '04_multiqc',
-        out = join(out_dir,'07_report'),
+        out = join(out_dir,'04_qc'),
         qc_config = join(source_dir,'config','multiqc_config.yaml'),
-        dir_fastq = expand(join(out_dir, '04_qc', 'fastqc')),
+        dir_fastq = join(out_dir, '04_qc', 'fastqc'),
+        dir_sam = join(out_dir, '04_qc', 'samtools'),
     envmodules:
         config['multiqc']
     output:
-        o1 = join(out_dir,'07_report','multiqc_report.html')
+        o1 = join(out_dir,'04_qc','multiqc_report.html')
     shell:
         """
         multiqc -f -v -c {params.qc_config} \
-        -d -dd 1 {params.dir_fastq} \
+        -d -dd 1 {params.dir_fastq} {params.dir_sam} \
         -o {params.out}
         """
 
@@ -362,7 +410,7 @@ rule qc_alignment:
         f1 = join(out_dir, '03_bam','{bc}_{masked_flag}.sorted.bam')
     params:
         rname = "04_qc_align",
-        R = join(source_dir,'workflow','scripts','alignment_stats.R'),
+        R = join(source_dir,'workflow','scripts','01_alignment_stats.R'),
         base = join(out_dir, '04_qc', 'alignment/')
     envmodules:
         config['samtools'],
@@ -378,7 +426,7 @@ rule qc_alignment:
         """
         samtools view -F 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_a}; \
         samtools view -f 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_u}; \
-        Rscript {params.R} {wildcards.bc} {output.bam_a} {output.bam_u} {params.base}
+        Rscript {params.R} "{wildcards.bc}_{wildcards.masked_flag}" {output.bam_a} {output.bam_u} {params.base}
         """
 
 if (masked_refs == "Y"):
@@ -401,14 +449,14 @@ if (masked_refs == "Y"):
         envmodules:
             config['R']
         output:
-            o1 = join(out_dir,'07_report','qc_report.html')
+            o1 = join(out_dir,'04_qc','qc_report.html')
         shell:
             """
             Rscript -e 'library(rmarkdown); \
             rmarkdown::render("{params.R}",
                 output_file = "{output.o1}", \
-                params= list(a_txt = "{input.txt_align}", \
-                u_txt = "{input.txt_unalign}"))'
+                params= list(a_txt = "{params.txt_align}", \
+                u_txt = "{params.txt_unalign}"))'
             """
 else:
     rule qc_troubleshoot:
@@ -426,7 +474,7 @@ else:
             envmodules:
                 config['R']
             output:
-                o1 = join(out_dir,'07_report','qc_report.html')
+                o1 = join(out_dir,'04_qc','qc_report.html')
             shell:
                 """
                 Rscript -e 'library(rmarkdown); \
@@ -473,21 +521,6 @@ rule talon_db:
             --o {params.base}
         '''
 
-
-#input for talon_prime dependent on whether cleanup is run -  will only run masked if that is present
-def get_talon_input(wildcards):
-    if (clean_up=="Y"):
-        if (masked_refs=="unmasked"):
-            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_unmasked.sorted_clean.sam')
-        else:
-            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_masked.sorted_clean.sam')
-    else:
-        if (masked_refs=="unmasked"):
-            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_unmasked.sorted.sam')
-        else:
-            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_masked.sorted.sam')
-    return(talon_input)
-
 rule talon_prime:
     '''
     Current long-read platforms that rely on poly-(A) selection are prone to internal priming artifacts. 
@@ -507,7 +540,7 @@ rule talon_prime:
         rname = "05.2_sam_label",
         sing_param = singularity_parameter, 
         doc = talon_conda,
-        anno = get_annotation_fa,
+        anno = get_annotation_path,
         base_tmp = join(out_dir,'tmp' + '_' + '{bc}'),
         base_sample = join(out_dir,'05_talon','sam_labeled','{bc}'),
         p_len = primer_len, 
@@ -724,7 +757,7 @@ rule flair_isoforms:
         rname = "06.2_flair_isoforms",
         sing_param = singularity_parameter, 
         doc = flair_conda,
-        anno_fa = get_annotation_fa,
+        anno_fa = get_annotation_path,
         anno_gtf = get_annotation_gtf,
         base = join(out_dir,'06_flair','isoforms','merged_flair'),
         tmp_dir = join(out_dir,'06_flair','tmp_iso'),
@@ -813,34 +846,29 @@ rule flair_abundances:
             --threads 16 \
         '''
 
-# rule flair_deg:
-#     '''
-#     #using the diff_iso_usage.py script instead
+rule flair_deg:
+    '''
+    #using the diff_iso_usage.py script instead
 
-#     singularity exec -B /scratch/kopardevn,/data/CCBR_Pipeliner /scratch/kopardevn/rbl3_test_out/ccbr_flair_v1.5.sif \
-#     bash -c "python3 /opt2/flair/bin/diff_iso_usage.py /scratch/kopardevn/rbl3_test_out/fastq/counts_matrix.tsv wt1_wt_b1 ko_drosha1_ko_drosha_b1 /scratch/kopardevn/rbl3_test_out/fastq/diff_iso_ko_drosha.txt"
-#     singularity exec -B /scratch/kopardevn,/data/CCBR_Pipeliner /scratch/kopardevn/rbl3_test_out/ccbr_flair_v1.5.sif \
-#     bash -c "python3 /opt2/flair/bin/diff_iso_usage.py /scratch/kopardevn/rbl3_test_out/fastq/counts_matrix.tsv wt1_wt_b1 ko_dicer1_ko_dicer_b1 /scratch/kopardevn/rbl3_test_out/fastq/diff_iso_ko_dicer.txt"
-
-#     '''
-#     input:
-#         f1 = join(out_dir,'09_flair','counts_matrix.tsv')
-#     params:
-#         rname = "create_sam",
-#         dosc = flair_conda,
-#         scripts = "/opt2/flair/bin/diff_iso_usage.py",
-#          sing_param = singularity_parameter, 
-#     envmodules:
-#         config['singularity'],
-#     output:
-#         o1 = join(out_dir,'09_flair','diff_iso_{group_id}.txt')
-#     shell:
-#     '''
-#     {params.sing_param} {params.doc} bash -c "python3 /opt2/flair/bin/diff_iso_usage.py \
-#         bash -c "python3 {params.scripts} {input.counts} wt1_wt_b1 ko_drosha1_ko_drosha_b1 /scratch/kopardevn/rbl3_test_out/fastq/diff_iso_ko_drosha.txt"
-#         singularity exec -B /scratch/kopardevn,/data/CCBR_Pipeliner /scratch/kopardevn/rbl3_test_out/ccbr_flair_v1.5.sif \
-#         bash -c "python3 /opt2/flair/bin/diff_iso_usage.py /scratch/kopardevn/rbl3_test_out/fastq/counts_matrix.tsv wt1_wt_b1 ko_dicer1_ko_dicer_b1 /scratch/kopardevn/rbl3_test_out/fastq/diff_iso_ko_dicer.txt"
-#     '''
+    singularity exec -B /scratch/kopardevn,/data/CCBR_Pipeliner /scratch/kopardevn/rbl3_test_out/ccbr_flair_v1.5.sif \
+    bash -c "python3 /opt2/flair/bin/diff_iso_usage.py /scratch/kopardevn/rbl3_test_out/fastq/counts_matrix.tsv 
+    wt1_wt_b1 ko_drosha1_ko_drosha_b1 /scratch/kopardevn/rbl3_test_out/fastq/diff_iso_ko_drosha.txt"
+    '''
+    input:
+        f1 = join(out_dir,'09_flair','counts_matrix.tsv')
+    params:
+        rname = "create_sam",
+        sing_param = singularity_parameter, 
+        docs = flair_conda,
+    envmodules:
+        config['singularity'],
+        config['python'], 
+    output:
+        o1 = join(out_dir,'09_flair','diff_iso_{group_id}.txt')
+    shell:
+        '''
+        {params.sing_param} {params.doc} bash -c "python3 diff_iso_usage.py {input.f1} {group_id} {output.o1}"
+        '''
 
 rule abundance_plots:
     input:
@@ -899,38 +927,3 @@ rule abundance_plots:
 #             /data/CCBR_Pipeliner/db/PipeDB/Indices/hg38_30/ref.fa --fl_count /data/sevillas2/rbl3/08_counts/SIRV_talon_abundance_filtered.tsv \
 #             --isoAnnotLite --gff3 /data/CCBR/projects/rbl3/dependencies/Homo_sapiens_GRCh38_Ensembl_86.gff3
 #         '''
-
-# '''
-# rule :
-#     input:
-#         f1 = 
-#     params:
-#         rname = "create_sam",
-#     envmodules:
-#         config[''],
-#     output:
-#         o1 = join(out_dir,)
-#     shell:
-# '''
-
-'''
-## download 
-   params:
-            rname = '01a_dl_fa',
-            ftp = 'http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M' + gencode_v + '/GRCm38.p6.genome.fa.gz',
-            base = join(out_dir, species, '01_source')
-        output:
-            o1 =  join(out_dir, species, '01_source', 'GRCm38.p6.genome.fa.gz'),
-        shell:
-            """
-            wget -P {params.base} {params.ftp}
-'http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M' + gencode_v + '/GRCm38.p6.genome.fa.gz',
-
-fa_file= "${project_location}/01_mask_fasta/mm10.fa"
-bed_file= "${project_location}/01_mask_fasta/ccbr1114.bed"
-output_file = "${project_location}/01_mask_fasta/masked_mm10.fa"
-
-## mask fasta
-## doc: https://bedtools.readthedocs.io/en/latest/content/tools/maskfasta.html
-
-'''
