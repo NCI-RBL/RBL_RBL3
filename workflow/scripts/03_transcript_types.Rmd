@@ -9,26 +9,19 @@ params:
     value: "~/../../Volumes/sevillas2-1/rbl3_final/06_flair/counts/flair_counts_matrix.tsv"
   output_dir:
     value: "~/../../Volumes/sevillas2-1/rbl3_final/07_report"
+  log_dir:
+    value: "~/../../Volumes/sevillas2-1/rbl3_final/log"
   perc_sim:
     value: 20
   num_match:
     value: 5
+  ref_masking:
+    value: FALSE
+  clean_up:
+    value: FALSE
 editor_options: 
   chunk_output_type: console
 ---
-
-# Project: Drosha regulates mRNA splicing or decay
-* Description (from PI)
-  * The project is to investigate Drosha-regulated genes and the mRNA splicing pattern in Drosha-KO.
-  * I have wildtype cells and Drosha-KO, Dicer-KO, DGCR8-KO, Drosha-Dicer-DKO and DGCR8-Dicer-DKO cells. I would like to check which genes are regulated by Drosha, and whether Drosha will change the mRNA splicing pattern using Nanopore mRNA-seq.
-  * Specifically, I would like to check whether Drosha regulates IGF2 by mRNA decay or alternative splicing. Thus, my question is: can I use Nanopore to detect the mRNA decay and alternative splicing by using a bioinformatics approach?
-
-# Analysis Workflow
-* Adapters are trimmed from FASTQ files with [porechop](https://github.com/rrwick/Porechop)
-* Sam files are corrected for mismatches, microindels, and noncanonical splice junctions in long reads that have been mapped to the genome with [TranscriptClean](https://github.com/mortazavilab/TranscriptClean)
-* QC is performed on FASTQ files with [FASTQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) and on BAM files with [SAMTOOLS](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
-* [TALON](https://github.com/mortazavilab/TALON) workflow is performed including read priming, abundance counts of transcripts, filtering transcripts and summarizing transcripts before and after filtering. See output summaries below.
-* [FLAIR](https://github.com/BrooksLabUCSC/flair#modules) workflow is performed. See partial summaries below, complete pipeline still in progress.
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 library(dplyr)
@@ -49,6 +42,16 @@ talon_unfiltered_data = params$u_talon_data
 flair_data = params$u_flair_data
 out_dir = params$output_dir
 ```
+
+# Analysis Workflow
+For complete workflow documentation, review the [Wiki](https://github.com/RBL-NCI/RBL_RBL3/wiki/Overview) page for the pipeline. This pipeline included parameters:
+
+- reference masking: ``r params$ref_masking``
+
+- transcript cleanup performed: ``r params$clean_up``
+
+Both parameters will impact the results below. For more detailed information on the parameters, review the snakemake_config.yaml file within the ``r params$log_dir`` directory.
+
 
 ```{r, echo=FALSE}
 #plot transcript read lengths, read counts, exon counts
@@ -148,14 +151,14 @@ TranscriptFeatures(talon_unfiltered_data,"    Unfiltered Data","unfiltered_abund
 Two files are generated, including:
 
 * A counts matrix was created, located at ```r talon_filtered_data```, which is previewed below:
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 #text files
 talon_df = read.csv(talon_filtered_data,sep="\t")
 kable(head(talon_df))
 ```
 
 * A transcript summary was generated from this filtered data, log10 transformed:
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 TranscriptFeatures(talon_filtered_data,"     Filtered Data","filtered_abundance")
 ```
 
@@ -165,7 +168,7 @@ TranscriptFeatures(talon_filtered_data,"     Filtered Data","filtered_abundance"
 Two files are generated, including:
 
 * A counts matrix was created, located at ```r flair_data```, which is previewed below:
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 #text files
 flair_df = read.csv(flair_data,sep="\t")
 i=2
@@ -175,3 +178,4 @@ for (colid in colnames(flair_df)[2:ncol(flair_df)]){
 }
 kable(head(flair_df))
 ```
+
