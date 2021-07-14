@@ -8,9 +8,9 @@ params:
   u_flair_data: 
     value: "~/../../Volumes/sevillas2/rbl3_test3/06_flair/counts/flair_counts_matrix.tsv"
   output_dir:
-    value: "~/../../Volumes/sevillas2-1/rbl3_test3/08_report"
+    value: "~/../../Volumes/sevillas2/rbl3_test3/08_report"
   log_dir:
-    value: "~/../../Volumes/sevillas2-1/rbl3_test3/log"
+    value: "~/../../Volumes/sevillas2/rbl3_test3/log"
   perc_sim:
     value: 20
   num_match:
@@ -19,6 +19,8 @@ params:
     value: "Y"
   clean_up:
     value: "Y"
+  deg_list:
+    value: "~/../../Volumes/sevillas2/rbl3_test3/07_deg/deg_iso_wt_ko.dicer.txt ~/../../Volumes/sevillas2/rbl3_test3/07_deg/deg_iso_wt_ko.drosha.txt"
 editor_options: 
   chunk_output_type: console
 ---
@@ -294,3 +296,38 @@ for (sampleid in sample_list){
   venn.title = paste0("TALON vs FLAIR Abundance Counts Filtered\n",sampleid)
   GenerateVennD(talon_list,flair_list,c("TALON","FLAIR"),color.list,venn.title,file.save)
 }
+
+```
+
+## DEG Analysis
+If DEG was performed, the following significant results were determined:
+```{r, echo = FALSE, message = FALSE}
+deg_files = as.list(strsplit(params$deg_list, '\\s+')[[1]])
+for (degs in deg_files){
+  
+  file_name = tail(strsplit(degs, '/')[[1]], n=1)
+  file_name = gsub(".txt","",file_name)
+  
+  sample1 = strsplit(file_name, '_')[[1]][3]
+  sample2 = strsplit(file_name, '_')[[1]][4]
+  
+  deg_df = read.csv(degs,sep="\t")
+  colnames(deg_df) = c("gene_name","isoform_name","p-value",
+                       paste0(sample1,"_IsoformCount"),paste0(sample2,"_IsoformCount"),
+                       paste0(sample1,"_AltIsoforms"),paste0(sample2,"_AltIsoforms"))
+  
+  #subset for sig values
+  sig_df = subset(deg_df, "p-value"<0.05)
+  
+  #write out results to txt if sig, otherwise print no values
+  if(nrow(sig_df)==0){
+    print(paste0("The comparison between ", sample1, " and ", sample2, " had no signifcant results."))
+  } else{
+    print(paste0("The comparison between ", sample1, " and ", sample2, " had ", nrow(sig_df), " signifcant results."))
+    write.csv(gsub("iso","sig",degs), sig_df)
+    print(paste0("Significant results were filtered and stored: ", gsub("iso","sig",degs)))
+  }
+  
+}
+```
+
