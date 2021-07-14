@@ -229,15 +229,15 @@ rule all:
         join(out_dir,'04_qc','qc_report.html'),
         
         #talon
-        join(out_dir,'05_talon', 'talon_config.csv'),
-        join(out_dir,'05_talon', build_id + '.db'),
-        expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
-        join(out_dir,'05_talon','annotate', build_id + '_talon_read_annot.tsv'),
-        join(out_dir,'05_talon','counts', build_id + '_talon_summary.tsv'),
-        join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
-        join(out_dir,'05_talon','counts', build_id + '_whitelist.txt'),
-        join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
-        join(out_dir,'05_talon','gtf', build_id + '_talon.gtf'),
+        # join(out_dir,'05_talon', 'talon_config.csv'),
+        # join(out_dir,'05_talon', build_id + '.db'),
+        # expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
+        # join(out_dir,'05_talon','annotate', build_id + '_talon_read_annot.tsv'),
+        # join(out_dir,'05_talon','counts', build_id + '_talon_summary.tsv'),
+        # join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
+        # join(out_dir,'05_talon','counts', build_id + '_whitelist.txt'),
+        # join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
+        # join(out_dir,'05_talon','gtf', build_id + '_talon.gtf'),
 
         #flair
         join(out_dir,'06_flair','merged.fastq.gz'),
@@ -928,6 +928,10 @@ rule flair_deg:
     singularity exec -B /scratch/kopardevn,/data/CCBR_Pipeliner /scratch/kopardevn/rbl3_test_out/ccbr_flair_v1.5.sif \
     bash -c "python3 /opt2/flair/bin/diff_iso_usage.py /scratch/kopardevn/rbl3_test_out/fastq/counts_matrix.tsv 
     wt1_wt_b1 ko_drosha1_ko_drosha_b1 /scratch/kopardevn/rbl3_test_out/fastq/diff_iso_ko_drosha.txt"
+
+    alternative diff is for projects with samples > 2 per group
+    - python flair.py diffExp -q counts_matrix.tsv -o output_directory [options]
+    - {params.sing_param} {params.docs} flair.py diffExp -q {input.f1} -o {params.base}
     '''
     input:
         f1 = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv')
@@ -935,7 +939,8 @@ rule flair_deg:
         rname = "06.4_flair_deg",
         sing_param = singularity_parameter, 
         docs = flair_conda,
-        groupid = get_deg_comparisons
+        groupid = get_deg_comparisons,
+        base = join(out_dir,'07_deg')
     envmodules:
         config['singularity'],
         config['python'], 
@@ -943,14 +948,16 @@ rule flair_deg:
         o1 = join(out_dir,'07_deg','deg_iso_{group_id}.txt')
     shell:
         '''
-        {params.sing_param} {params.docs} diff_iso_usage.py {input.f1} {params.groupid} {output.o1}
+        mkdir -p {params.base};
+        {params.sing_param} {params.docs} bash -c "python3 /opt2/flair/bin/diff_iso_usage.py {input.f1} {params.groupid} {output.o1}"
         '''
 
 rule abundance_plots:
     input:
         unfilt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
         filt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
-        flair = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv')
+        flair = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv'),
+        degs = expand(join(out_dir,'07_deg','deg_iso_{group_id}.txt'),group_id=deg_list)
     params:
         rname = "07_abundance_plots",
         R = join(source_dir,"workflow","scripts","03_transcript_types.Rmd"),
@@ -963,7 +970,8 @@ rule abundance_plots:
     envmodules:
         config['R'],
     output:
-        o1 = join(out_dir,'08_report','summary_report.html')
+        o1 = join(out_dir,'08_report','summary_report.html'),
+        o2 = join(out_dir,'08_report','img','filtered_abundance.png')
     shell:
         '''
         Rscript -e 'library(rmarkdown); \
@@ -977,7 +985,8 @@ rule abundance_plots:
                 perc_sim = "{params.perc_sim}", \
                 ref_masking = "{params.ref}", \
                 clean_up = "{params.clean}", \
-                num_match = "{params.num_match}"))'
+                num_match = "{params.num_match}", \
+                deg_list = "{input.degs}"))'
         '''
 
 # rule squanti:
