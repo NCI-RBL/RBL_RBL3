@@ -2,28 +2,28 @@
 output: html_document
 params:
   f_talon_data: 
-    value: "~/../../Volumes/sevillas2-1/rbl3_final/05_talon/counts/SIRV_talon_abundance_filtered.tsv"
+    value: "~/../../Volumes/sevillas2/rbl3_test3/05_talon/counts/SIRV_talon_abundance_filtered.tsv"
   u_talon_data: 
-    value: "~/../../Volumes/sevillas2-1/rbl3_final/05_talon/counts/SIRV_talon_abundance.tsv"
+    value: "~/../../Volumes/sevillas2/rbl3_test3/05_talon/counts/SIRV_talon_abundance.tsv"
   u_flair_data: 
-    value: "~/../../Volumes/sevillas2-1/rbl3_final/06_flair/counts/flair_counts_matrix.tsv"
+    value: "~/../../Volumes/sevillas2/rbl3_test3/06_flair/counts/flair_counts_matrix.tsv"
   output_dir:
-    value: "~/../../Volumes/sevillas2-1/rbl3_final/07_report"
+    value: "~/../../Volumes/sevillas2-1/rbl3_test3/08_report"
   log_dir:
-    value: "~/../../Volumes/sevillas2-1/rbl3_final/log"
+    value: "~/../../Volumes/sevillas2-1/rbl3_test3/log"
   perc_sim:
     value: 20
   num_match:
     value: 5
   ref_masking:
-    value: FALSE
+    value: "Y"
   clean_up:
-    value: FALSE
+    value: "Y"
 editor_options: 
   chunk_output_type: console
 ---
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
 library(dplyr)
 library(ggplot2)
 library(tidyverse)
@@ -31,7 +31,8 @@ library(ggpubr)
 library(reshape2)
 library(knitr)
 library(stringr)
-
+library(VennDiagram)
+library(png)
 #references
 #https://www.biorxiv.org/content/10.1101/672931v2.supplementary-material
 ```
@@ -113,7 +114,7 @@ TranscriptFeatures <- function(df_in,title_in,type_in) {
   print(p_final)
   
   #save plot
-  ggsave(paste0(out_dir,"/",type_in,".png"),p_final)
+  ggsave(paste0(out_dir,"/img/",type_in,".png"),p_final)
 } 
 ```
 
@@ -165,17 +166,131 @@ TranscriptFeatures(talon_filtered_data,"     Filtered Data","filtered_abundance"
 ### Flair data
  **Flair identified transcripts are summarized prior to DEG:**
  
-Two files are generated, including:
+A single output is generated, including:
 
 * A counts matrix was created, located at ```r flair_data```, which is previewed below:
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 #text files
 flair_df = read.csv(flair_data,sep="\t")
+
+#rename cols to only sample ids (sampleid_groupid_batchid)
 i=2
 for (colid in colnames(flair_df)[2:ncol(flair_df)]){
   colnames(flair_df)[i] <- str_split(colid, "_")[[1]][[1]]
   i= i+1
 }
 kable(head(flair_df))
+
+#rename annotation ids
+flair_df$annot_gene_id = as.character(lapply(flair_df$ids,function(x){strsplit(x,"_",fixed=TRUE)[[1]][[2]]}))
 ```
 
+* A transcript summary was generated:
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+flair_graph = data.frame(1:2)
+flair_graph$Type = c("Known","Novel")
+flair_graph[1,"Count"] = nrow(flair_df[grep("ENS", flair_df$ids), ])
+flair_graph[2,"Count"] = nrow(flair_df)-flair_graph[1,"Count"]
+flair_graph = flair_graph[-1]
+head(flair_graph)
+
+p1 = ggplot(flair_graph,aes(x = Type,y = Count)) + 
+      geom_bar(aes(fill = Type),stat = "identity",position = "dodge") + 
+    labs(y="Transcript Counts", fill = "sample_id") + 
+    ggtitle("Plot of transcript counts \n\n") +
+    scale_fill_brewer(palette="Dark2") + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p1 + ylim(0, (max(flair_graph$Count)+5)))
+```
+  
+
+## Comparative Data
+The following compares the outputs of each of the pipelines:
+
+
+```{r, echo= FALSE, message = FALSE, warning = FALSE, fig.width=5, fig.height=5}
+####################################################################################
+# Functions
+####################################################################################
+#create unique list of genes
+create_gene_list <- function(col_select, df_in,sampleid, df_type, novel_included="Y"){
+  gene_list = subset(df_in,get(col_select) > 0)$annot_gene_id
+  
+  if(novel_included=="N"){
+    gene_list = gene_list[grepl("ENSG",gene_list)]
+  }
+  return(unique(gene_list))
+}
+
+#generates venn diagram from list inputs
+GenerateVennD <- function(list1,list2,list.names,list.cols,title.in,fname){
+  
+  #save to dir
+  venn.diagram(
+    #create venn
+    x=list(list1,list2),
+    category.names = list.names,
+    fill=list.cols,
+    
+    #title
+    main=title.in,
+    main.cex = 1.5,
+    
+    #output
+    filename = fname,
+    output = TRUE
+  )
+  
+  #print to report
+  x=list("talon" = list1, "flair" = list2)
+  display_venn <- function(x, ...){
+    grid.newpage()
+    venn_object <- venn.diagram(x, 
+      #create venn
+      category.names = list.names,
+      fill=list.cols,
+      
+      #title
+      main=title.in,
+      main.cex = 1.5,
+      
+      #image
+      filename = NULL, ...)
+    grid.draw(venn_object)
+  }
+  # Four dimension Venn plot
+  display_venn(x)
+}
+
+####################################################################################
+# main code
+####################################################################################
+
+#determine sample ids
+sample_list = colnames(flair_df)[2:(ncol(flair_df)-1)]
+
+#perform comparison for unfiltered data
+for (sampleid in sample_list){
+  #generate gene lists for each feature
+  talon_list = create_gene_list(sampleid, talon_df, sampleid, "TALON")
+  flair_list = create_gene_list(sampleid, flair_df, sampleid, "FLAIR")
+  
+  #create venn diagrams to visualize
+  file.save = paste0(out_dir,"/img/venndiagram_",sampleid,".tiff")
+  color.list =  c("light blue", "pink")
+  venn.title = paste0("TALON vs FLAIR Abundance Counts\n",sampleid)
+  GenerateVennD(talon_list,flair_list,c("TALON","FLAIR"),color.list,venn.title,file.save)
+}
+
+#perform comparison for filtered data
+for (sampleid in sample_list){
+  #generate gene lists for each feature
+  talon_list = create_gene_list(sampleid, talon_df, sampleid, "TALON")
+  flair_list = create_gene_list(sampleid, flair_df, sampleid, "FLAIR","N")
+  
+  #create venn diagrams to visualize
+  file.save = paste0(out_dir,"/img/venndiagram_filt_",sampleid,".png")
+  color.list =  c("light blue", "pink")
+  venn.title = paste0("TALON vs FLAIR Abundance Counts Filtered\n",sampleid)
+  GenerateVennD(talon_list,flair_list,c("TALON","FLAIR"),color.list,venn.title,file.save)
+}
