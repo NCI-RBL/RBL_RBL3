@@ -2,35 +2,30 @@
 output: html_document
 params:
   f_talon_data: 
-    value: "~/../../Volumes/sevillas2-1/rbl3_final/05_talon/counts/SIRV_talon_abundance_filtered.tsv"
+    value: "~/../../Volumes/sevillas2/rbl3_test3/05_talon/counts/SIRV_talon_abundance_filtered.tsv"
   u_talon_data: 
-    value: "~/../../Volumes/sevillas2-1/rbl3_final/05_talon/counts/SIRV_talon_abundance.tsv"
+    value: "~/../../Volumes/sevillas2/rbl3_test3/05_talon/counts/SIRV_talon_abundance.tsv"
   u_flair_data: 
-    value: "~/../../Volumes/sevillas2-1/rbl3_final/06_flair/counts/flair_counts_matrix.tsv"
+    value: "~/../../Volumes/sevillas2/rbl3_test3/06_flair/counts/flair_counts_matrix.tsv"
   output_dir:
-    value: "~/../../Volumes/sevillas2-1/rbl3_final/07_report"
+    value: "~/../../Volumes/sevillas2/rbl3_test3/08_report"
+  log_dir:
+    value: "~/../../Volumes/sevillas2/rbl3_test3/log"
   perc_sim:
     value: 20
   num_match:
     value: 5
+  ref_masking:
+    value: "Y"
+  clean_up:
+    value: "Y"
+  deg_list:
+    value: "~/../../Volumes/sevillas2/rbl3_test3/07_deg/deg_iso_wt_ko.dicer.txt ~/../../Volumes/sevillas2/rbl3_test3/07_deg/deg_iso_wt_ko.drosha.txt"
 editor_options: 
   chunk_output_type: console
 ---
 
-# Project: Drosha regulates mRNA splicing or decay
-* Description (from PI)
-  * The project is to investigate Drosha-regulated genes and the mRNA splicing pattern in Drosha-KO.
-  * I have wildtype cells and Drosha-KO, Dicer-KO, DGCR8-KO, Drosha-Dicer-DKO and DGCR8-Dicer-DKO cells. I would like to check which genes are regulated by Drosha, and whether Drosha will change the mRNA splicing pattern using Nanopore mRNA-seq.
-  * Specifically, I would like to check whether Drosha regulates IGF2 by mRNA decay or alternative splicing. Thus, my question is: can I use Nanopore to detect the mRNA decay and alternative splicing by using a bioinformatics approach?
-
-# Analysis Workflow
-* Adapters are trimmed from FASTQ files with [porechop](https://github.com/rrwick/Porechop)
-* Sam files are corrected for mismatches, microindels, and noncanonical splice junctions in long reads that have been mapped to the genome with [TranscriptClean](https://github.com/mortazavilab/TranscriptClean)
-* QC is performed on FASTQ files with [FASTQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) and on BAM files with [SAMTOOLS](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
-* [TALON](https://github.com/mortazavilab/TALON) workflow is performed including read priming, abundance counts of transcripts, filtering transcripts and summarizing transcripts before and after filtering. See output summaries below.
-* [FLAIR](https://github.com/BrooksLabUCSC/flair#modules) workflow is performed. See partial summaries below, complete pipeline still in progress.
-
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
 library(dplyr)
 library(ggplot2)
 library(tidyverse)
@@ -38,7 +33,8 @@ library(ggpubr)
 library(reshape2)
 library(knitr)
 library(stringr)
-
+library(VennDiagram)
+library(png)
 #references
 #https://www.biorxiv.org/content/10.1101/672931v2.supplementary-material
 ```
@@ -49,6 +45,16 @@ talon_unfiltered_data = params$u_talon_data
 flair_data = params$u_flair_data
 out_dir = params$output_dir
 ```
+
+# Analysis Workflow
+For complete workflow documentation, review the [Wiki](https://github.com/RBL-NCI/RBL_RBL3/wiki/Overview) page for the pipeline. This pipeline included parameters:
+
+- reference masking: ``r params$ref_masking``
+
+- transcript cleanup performed: ``r params$clean_up``
+
+Both parameters will impact the results below. For more detailed information on the parameters, review the snakemake_config.yaml file within the ``r params$log_dir`` directory.
+
 
 ```{r, echo=FALSE}
 #plot transcript read lengths, read counts, exon counts
@@ -110,7 +116,7 @@ TranscriptFeatures <- function(df_in,title_in,type_in) {
   print(p_final)
   
   #save plot
-  ggsave(paste0(out_dir,"/",type_in,".png"),p_final)
+  ggsave(paste0(out_dir,"/img/",type_in,".png"),p_final)
 } 
 ```
 
@@ -148,30 +154,180 @@ TranscriptFeatures(talon_unfiltered_data,"    Unfiltered Data","unfiltered_abund
 Two files are generated, including:
 
 * A counts matrix was created, located at ```r talon_filtered_data```, which is previewed below:
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 #text files
 talon_df = read.csv(talon_filtered_data,sep="\t")
 kable(head(talon_df))
 ```
 
 * A transcript summary was generated from this filtered data, log10 transformed:
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 TranscriptFeatures(talon_filtered_data,"     Filtered Data","filtered_abundance")
 ```
 
 ### Flair data
  **Flair identified transcripts are summarized prior to DEG:**
  
-Two files are generated, including:
+A single output is generated, including:
 
 * A counts matrix was created, located at ```r flair_data```, which is previewed below:
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
 #text files
 flair_df = read.csv(flair_data,sep="\t")
+
+#rename cols to only sample ids (sampleid_groupid_batchid)
 i=2
 for (colid in colnames(flair_df)[2:ncol(flair_df)]){
   colnames(flair_df)[i] <- str_split(colid, "_")[[1]][[1]]
   i= i+1
 }
 kable(head(flair_df))
+
+#rename annotation ids
+flair_df$annot_gene_id = as.character(lapply(flair_df$ids,function(x){strsplit(x,"_",fixed=TRUE)[[1]][[2]]}))
 ```
+
+* A transcript summary was generated:
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+flair_graph = data.frame(1:2)
+flair_graph$Type = c("Known","Novel")
+flair_graph[1,"Count"] = nrow(flair_df[grep("ENS", flair_df$ids), ])
+flair_graph[2,"Count"] = nrow(flair_df)-flair_graph[1,"Count"]
+flair_graph = flair_graph[-1]
+head(flair_graph)
+
+p1 = ggplot(flair_graph,aes(x = Type,y = Count)) + 
+      geom_bar(aes(fill = Type),stat = "identity",position = "dodge") + 
+    labs(y="Transcript Counts", fill = "sample_id") + 
+    ggtitle("Plot of transcript counts \n\n") +
+    scale_fill_brewer(palette="Dark2") + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p1 + ylim(0, (max(flair_graph$Count)+5)))
+```
+  
+
+## Comparative Data
+The following compares the outputs of each of the pipelines:
+
+
+```{r, echo= FALSE, message = FALSE, warning = FALSE, fig.width=5, fig.height=5}
+####################################################################################
+# Functions
+####################################################################################
+#create unique list of genes
+create_gene_list <- function(col_select, df_in,sampleid, df_type, novel_included="Y"){
+  gene_list = subset(df_in,get(col_select) > 0)$annot_gene_id
+  
+  if(novel_included=="N"){
+    gene_list = gene_list[grepl("ENSG",gene_list)]
+  }
+  return(unique(gene_list))
+}
+
+#generates venn diagram from list inputs
+GenerateVennD <- function(list1,list2,list.names,list.cols,title.in,fname){
+  
+  #save to dir
+  venn.diagram(
+    #create venn
+    x=list(list1,list2),
+    category.names = list.names,
+    fill=list.cols,
+    
+    #title
+    main=title.in,
+    main.cex = 1.5,
+    
+    #output
+    filename = fname,
+    output = TRUE
+  )
+  
+  #print to report
+  x=list("talon" = list1, "flair" = list2)
+  display_venn <- function(x, ...){
+    grid.newpage()
+    venn_object <- venn.diagram(x, 
+      #create venn
+      category.names = list.names,
+      fill=list.cols,
+      
+      #title
+      main=title.in,
+      main.cex = 1.5,
+      
+      #image
+      filename = NULL, ...)
+    grid.draw(venn_object)
+  }
+  # Four dimension Venn plot
+  display_venn(x)
+}
+
+####################################################################################
+# main code
+####################################################################################
+
+#determine sample ids
+sample_list = colnames(flair_df)[2:(ncol(flair_df)-1)]
+
+#perform comparison for unfiltered data
+for (sampleid in sample_list){
+  #generate gene lists for each feature
+  talon_list = create_gene_list(sampleid, talon_df, sampleid, "TALON")
+  flair_list = create_gene_list(sampleid, flair_df, sampleid, "FLAIR")
+  
+  #create venn diagrams to visualize
+  file.save = paste0(out_dir,"/img/venndiagram_",sampleid,".tiff")
+  color.list =  c("light blue", "pink")
+  venn.title = paste0("TALON vs FLAIR Abundance Counts\n",sampleid)
+  GenerateVennD(talon_list,flair_list,c("TALON","FLAIR"),color.list,venn.title,file.save)
+}
+
+#perform comparison for filtered data
+for (sampleid in sample_list){
+  #generate gene lists for each feature
+  talon_list = create_gene_list(sampleid, talon_df, sampleid, "TALON")
+  flair_list = create_gene_list(sampleid, flair_df, sampleid, "FLAIR","N")
+  
+  #create venn diagrams to visualize
+  file.save = paste0(out_dir,"/img/venndiagram_filt_",sampleid,".png")
+  color.list =  c("light blue", "pink")
+  venn.title = paste0("TALON vs FLAIR Abundance Counts Filtered\n",sampleid)
+  GenerateVennD(talon_list,flair_list,c("TALON","FLAIR"),color.list,venn.title,file.save)
+}
+
+```
+
+## DEG Analysis
+If DEG was performed, the following significant results were determined:
+```{r, echo = FALSE, message = FALSE}
+deg_files = as.list(strsplit(params$deg_list, '\\s+')[[1]])
+for (degs in deg_files){
+  
+  file_name = tail(strsplit(degs, '/')[[1]], n=1)
+  file_name = gsub(".txt","",file_name)
+  
+  sample1 = strsplit(file_name, '_')[[1]][3]
+  sample2 = strsplit(file_name, '_')[[1]][4]
+  
+  deg_df = read.csv(degs,sep="\t")
+  colnames(deg_df) = c("gene_name","isoform_name","p-value",
+                       paste0(sample1,"_IsoformCount"),paste0(sample2,"_IsoformCount"),
+                       paste0(sample1,"_AltIsoforms"),paste0(sample2,"_AltIsoforms"))
+  
+  #subset for sig values
+  sig_df = subset(deg_df, "p-value"<0.05)
+  
+  #write out results to txt if sig, otherwise print no values
+  if(nrow(sig_df)==0){
+    print(paste0("The comparison between ", sample1, " and ", sample2, " had no signifcant results."))
+  } else{
+    print(paste0("The comparison between ", sample1, " and ", sample2, " had ", nrow(sig_df), " signifcant results."))
+    write.csv(gsub("iso","sig",degs), sig_df)
+    print(paste0("Significant results were filtered and stored: ", gsub("iso","sig",degs)))
+  }
+  
+}
+```
+

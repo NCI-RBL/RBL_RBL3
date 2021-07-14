@@ -32,22 +32,20 @@ num_match = config['number_of_matches']
 ###############################################################
 # functions
 ###############################################################
-#ref information
-def get_annotation_path(wildcards):
-    if (wildcards.masked_flag == "masked"):
-        anno_fa=config['annotation_fa_masked']
+#annotation FA with wildcards
+#if wildcards are used for bc, check if masking is required 
+def get_annotation_fa(wildcards):
+    if hasattr('wildcards', 'masked_flag'):
+        if (wildcards.masked_flag == "masked"):
+            anno_file=join(out_dir,"00_tmp","annotation_files","masked.fa")
+        else:
+            anno_file=join(out_dir,"00_tmp","annotation_files","unmasked.fa")
     else:
-        anno_fa=config['annotation_fa']
-    return(anno_fa)
-
-def get_annotation_name(wildcards):
-    if (wildcards.masked_flag == "masked"):
-        anno_fa=config['annotation_fa_masked']
-    else:
-        anno_fa=config['annotation_fa']
-    
-    anno_fa=anno_fa.rsplit('/', 1)[-1]
-    return(anno_fa)
+        if (masked_refs == "Y"):
+            anno_file=join(out_dir,"00_tmp","annotation_files","masked.fa")
+        else:
+            anno_file=join(out_dir,"00_tmp","annotation_files","unmasked.fa")
+    return(anno_file)
 
 #input for bam dependent on whether cleanup is run
 def get_bam_input(wildcards):
@@ -58,29 +56,74 @@ def get_bam_input(wildcards):
 
     return(bam_input)
 
+#annotation GTF with wildcards
 def get_annotation_gtf(wildcards):
-    if(wildcards.masked_flag == "masked"):
-        anno_gtf=config['annotation_gtf_masked']
+    if hasattr('wildcards', 'masked_flag'):
+        if (wildcards.masked_flag == "masked"):
+            anno_file=join(out_dir,"00_tmp","annotation_files","masked.gtf")
+        else:
+            anno_file=join(out_dir,"00_tmp","annotation_files","unmasked.gtf")
     else:
-        anno_gtf=config['annotation_gtf']
-    return(anno_gtf)
+        if (masked_refs == "Y"):
+            anno_file=join(out_dir,"00_tmp","annotation_files","masked.gtf")
+        else:
+            anno_file=join(out_dir,"00_tmp","annotation_files","unmasked.gtf")
+    return(anno_file)
 
-#set input for talon gtf
-def get_annotation_gtf_talon(wildcards):
-    if(masked_refs == "Y"):
-        anno_gtf=config['annotation_gtf_masked']
-    else:
-        anno_gtf=config['annotation_gtf']
-    return(anno_gtf)
-
-def get_annotation_name_talon(wildcards):
-    if(masked_refs == "Y"):
-        anno_fa=config['annotation_fa_masked']
-    else:
-        anno_fa=config['annotation_fa']
+#talon config
+def talon_config(wildcards):
     
-    anno_fa=anno_fa.rsplit('/', 1)[-1]
-    return(anno_fa)
+    #create array for config
+    config_data = []
+
+    #for each of the barcodes, generate config info
+    #example: SIRV_Rep1,SIRV,PacBio-Sequel2,/data/sevillas2/RBL3/tutorial/labeled/SIRV_rep1_labeled.sam
+    for bc in bc_list:
+        df_sub = df_sample[df_sample["filename"] == bc]
+        
+        output_filename = join(out_dir,'05_talon','sam_labeled',bc + '_labeled.sam')
+        config_data.append(df_sub.iloc[0]['sampleid'] + "," + build_id + "," + platform_id + "," + output_filename)
+    
+    #create config
+    talon_config = join(out_dir,'05_talon', 'talon_config.csv')
+    with open(talon_config, "w") as txt_file:
+        for line in config_data:
+            txt_file.write(line + "\n")
+
+#input for talon_prime dependent on whether cleanup is run -  will only run masked if that is present
+def get_talon_input(wildcards):
+    if (clean_up=="Y"):
+        if (masked_refs=="N"):
+            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_unmasked.sorted_clean.sam')
+        else:
+            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_masked.sorted_clean.sam')
+    else:
+        if (masked_refs=="N"):
+            talon_input = join(out_dir,'02_sam',wildcards.bc + '_unmasked.sorted.sam')
+        else:
+            talon_input = join(out_dir,'02_sam',wildcards.bc + '_masked.sorted.sam')
+    return(talon_input)
+
+#flair config
+def flair_config(wildcards):
+    
+    #create array for config
+    config_data = []
+
+    #for each of the barcodes, generate config info
+    #sampleid condition batchid fastqfile
+    #example: wt1	wt	b1	/scratch/kopardevn/rbl3_test_out/fastq/barcode01.trimmed.R1.fastq.gz
+    for bc in bc_list:
+        df_sub = df_sample[df_sample["filename"] == bc]
+        
+        fq_name = join(out_dir,'06_flair','fastq', bc + '.fastq')
+        config_data.append(df_sub.iloc[0]['sampleid'] + "\t" + df_sub.iloc[0]['groupid'] + "\t" + df_sub.iloc[0]['batchid'] + "\t" + fq_name)
+    
+    #create config
+    flair_config = join(out_dir,'06_flair', 'flair_config.csv')
+    with open(flair_config, "w") as txt_file:
+        for line in config_data:
+            txt_file.write(line + "\n")
 
 def get_deg_list():
     list_path=deg_manifest
@@ -106,60 +149,23 @@ def get_deg_list():
 
     return(deg_list)
 
-#talon config
-def talon_config(wildcards):
-    
-    #create array for config
-    config_data = []
+def get_deg_comparisons(wildcards):
 
-    #for each of the barcodes, generate config info
-    #example: SIRV_Rep1,SIRV,PacBio-Sequel2,/data/sevillas2/RBL3/tutorial/labeled/SIRV_rep1_labeled.sam
-    for bc in bc_list:
-        df_sub = df_sample[df_sample["filename"] == bc]
-        
-        output_filename = join(out_dir,'05_talon','sam_labeled',bc + '_labeled.sam')
-        config_data.append(df_sub.iloc[0]['sampleid'] + "," + build_id + "," + platform_id + "," + output_filename)
-    
-    #create config
-    talon_config = join(out_dir,'05_talon', 'talon_config.csv')
-    with open(talon_config, "w") as txt_file:
-        for line in config_data:
-            txt_file.write(line + "\n")
+  #create split sample ids
+  id1 = wildcards.group_id.split("_")[0]
+  id2 = wildcards.group_id.split("_")[1]
 
-#flair config
-def flair_config(wildcards):
+  #create group ids
+  sub_df = df_sample[df_sample['sampleid']==id1]
+  group1 = id1 + "_" + sub_df.iloc[0]['groupid'] + "_" + sub_df.iloc[0]['batchid']
     
-    #create array for config
-    config_data = []
+  sub_df = df_sample[df_sample['sampleid']==id2]
+  group2 = id2 + "_" + sub_df.iloc[0]['groupid'] + "_" + sub_df.iloc[0]['batchid']
 
-    #for each of the barcodes, generate config info
-    #sampleid condition batchid fastqfile
-    #example: wt1	wt	b1	/scratch/kopardevn/rbl3_test_out/fastq/barcode01.trimmed.R1.fastq.gz
-    for bc in bc_list:
-        df_sub = df_sample[df_sample["filename"] == bc]
-        
-        fq_name = join(out_dir,'06_flair','fastq', bc + '.fastq')
-        config_data.append(df_sub.iloc[0]['sampleid'] + "\t" + df_sub.iloc[0]['groupid'] + "\t" + df_sub.iloc[0]['batchid'] + "\t" + fq_name)
-    
-    #create config
-    flair_config = join(out_dir,'06_flair', 'flair_config.csv')
-    with open(flair_config, "w") as txt_file:
-        for line in config_data:
-            txt_file.write(line + "\n")
+  #create merged groupid
+  groupid = group1 + " " + group2
 
-#input for talon_prime dependent on whether cleanup is run -  will only run masked if that is present
-def get_talon_input(wildcards):
-    if (clean_up=="Y"):
-        if (masked_refs=="unmasked"):
-            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_unmasked.sorted_clean.sam')
-        else:
-            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_masked.sorted_clean.sam')
-    else:
-        if (masked_refs=="unmasked"):
-            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_unmasked.sorted.sam')
-        else:
-            talon_input = join(out_dir,'02_sam_corrected',wildcards.bc + '_masked.sorted.sam')
-    return(talon_input)
+  return (groupid)
 ###############################################################
 # main code
 ###############################################################
@@ -180,8 +186,19 @@ deg_list = get_deg_list()
 # rule all
 ###############################################################
 #local rules
-localrules: talon_config, flair_config
+localrules: talon_config, flair_config, flair_fastq
 
+#annotation file output will differ depending on masking of reference files
+if (masked_refs=="Y"):
+    input_annotation = [join(out_dir,"00_tmp","annotation_files","unmasked.gtf"),
+                        join(out_dir,"00_tmp","annotation_files","unmasked.fa"),
+                        join(out_dir,"00_tmp","annotation_files","masked.gtf"),
+                        join(out_dir,"00_tmp","annotation_files","masked.fa")]
+else:
+    input_annotation = [join(out_dir,"00_tmp","annotation_files","unmasked.gtf"),
+                        join(out_dir,"00_tmp","annotation_files","unmasked.fa")]
+
+#sam files output will differ depending on cleanup
 if clean_up=="Y":
     input_sam = [expand(join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam'),bc=bc_list, masked_flag=masked_list),
                 expand(join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted_clean.sam'),bc=bc_list, masked_flag=masked_list)]
@@ -190,6 +207,9 @@ else:
 
 rule all:
     input:
+        #input annotation files
+        input_annotation,
+
         #input fastq files
         expand(join(fastq_dir,'{bc}.fastq'),bc=bc_list),
         expand(join(out_dir,'01_fastq','{bc}.fastq.gz'),bc=bc_list),
@@ -209,9 +229,9 @@ rule all:
         join(out_dir,'04_qc','qc_report.html'),
         
         #talon
-        join(out_dir,'05_talon', 'talon_config.csv'),
-        join(out_dir,'05_talon', build_id + '.db'),
-        expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
+        # join(out_dir,'05_talon', 'talon_config.csv'),
+        # join(out_dir,'05_talon', build_id + '.db'),
+        # expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
         # join(out_dir,'05_talon','annotate', build_id + '_talon_read_annot.tsv'),
         # join(out_dir,'05_talon','counts', build_id + '_talon_summary.tsv'),
         # join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
@@ -219,16 +239,16 @@ rule all:
         # join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
         # join(out_dir,'05_talon','gtf', build_id + '_talon.gtf'),
 
-        # #flair
-        # join(out_dir,'06_flair','merged.fastq.gz'),
-        # join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa'),
-        # join(out_dir,'06_flair','flair_config.csv'),
-        # expand(join(out_dir,'06_flair','fastq','{bc}.fastq'),bc=bc_list),
-        # join(out_dir,'06_flair','counts','flair_counts_matrix.tsv'),
-        # # expand(join(out_dir,'09_flair','diff_iso_{group_id}.txt'),group_id=deg_list),
+        #flair
+        join(out_dir,'06_flair','merged.fastq.gz'),
+        join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa'),
+        join(out_dir,'06_flair','flair_config.csv'),
+        expand(join(out_dir,'06_flair','fastq','{bc}.fastq'),bc=bc_list),
+        join(out_dir,'06_flair','counts','flair_counts_matrix.tsv'),
+        expand(join(out_dir,'07_deg','deg_iso_{group_id}.txt'),group_id=deg_list),
 
-        # #report
-        # join(out_dir,'07_report','summary_report.html'),
+        #report
+        join(out_dir,'08_report','summary_report.html'),
 
         # #squanti
         # #join(out_dir,'tbd'),
@@ -248,6 +268,45 @@ else:
 ###############################################################
 # snakemake rules
 ###############################################################
+rule copy_annotation_unmasked:
+    '''
+    create local instance of annotation files to be removed upon pipeline completion
+    '''
+     input:
+        fa = config['annotation_fa'],
+        gtf = config['annotation_gtf']
+    params:
+        rname = "01_copy_annotation_unmasked",
+        base = join(out_dir,"00_annotation_files")
+    output:
+        fa = temp(join(out_dir,"00_tmp","annotation_files","unmasked.fa")),
+        gtf = temp(join(out_dir,"00_tmp","annotation_files","unmasked.gtf"))
+    shell:
+        """
+        cp {input.fa} {output.fa}; \
+        cp {input.gtf} {output.gtf}
+        """
+
+if (masked_refs=="Y"):
+    rule copy_annotation_masked:
+        '''
+        create local instance of annotation files to be removed upon pipeline completion
+        '''
+        input:
+            fa = config['annotation_fa_masked'],
+            gtf = config['annotation_gtf_masked']
+        params:
+            rname = "01_copy_annotation_masked",
+            base = join(out_dir,"00_annotation_files")
+        output:
+            fa = temp(join(out_dir,"00_tmp","annotation_files","masked.fa")),
+            gtf = temp(join(out_dir,"00_tmp","annotation_files","masked.gtf"))
+        shell:
+            """
+            cp {input.fa} {output.fa}; \
+            cp {input.gtf} {output.gtf}
+            """
+
 rule handle_fastq:
     '''
     move and zip fastq files 
@@ -294,7 +353,7 @@ rule create_sam:
         f1 = join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz')
     params:
         rname = "02_sam",
-        fa = get_annotation_path
+        anno_fa = get_annotation_fa
     envmodules:
         config['minimap2'],
         config['samtools']
@@ -305,7 +364,7 @@ rule create_sam:
         '''
         minimap2 \
         -ax splice -t 30 --secondary=no --MD \
-        {params.fa} {input.f1} > {output.sam};
+        {params.anno_fa} {input.f1} > {output.sam};
         samtools sort {output.sam} -o {output.sorted}
         '''
 
@@ -322,20 +381,17 @@ if (clean_up=="Y"):
             rname = "02_sam_corrected",
             sing_param = singularity_parameter, 
             doc = talon_conda,
-            anno_fa_path = get_annotation_path,
-            anno_fa_name = get_annotation_name,
+            anno_fa = get_annotation_fa,
             base = join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted'),
-            tmp_dir = join(out_dir,'02_sam_corrected','tmp_{bc}_{masked_flag}')
+            tmp_dir = join(out_dir,'00_tmp','sam_corrected','tmp_{bc}_{masked_flag}/')
         envmodules:
             config['singularity'],
         output:
             o1 = join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted_clean.sam')
         shell:
             '''
-            if [ -w "/lscratch/${{SLURM_JOB_ID}}" ];then tmpdir="/lscratch/${{SLURM_JOB_ID}}";else tmpdir={params.tmp_dir};fi
-            cp {params.anno_fa_path} "${{tmpdir}}/{params.anno_fa_name}";
-            {params.sing_param} {params.doc} TranscriptClean.py --sam {input.f1} --genome "${{tmpdir}}/{params.anno_fa_name}" \
-            --tmpDir $tmpdir --outprefix {params.base} --deleteTmp;
+            {params.sing_param} {params.doc} TranscriptClean.py --sam {input.f1} --genome {params.anno_fa} \
+            --tmpDir {params.tmp_dir} --outprefix {params.base};
             '''
 
 rule create_bam:
@@ -481,10 +537,10 @@ else:
             generates a PDF of barcode plots and alignment plots for qc troubleshooting
             """
             input:
-                png_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_aligned.png'), bc=bc_list),
-                png_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_unaligned.png'), bc=bc_list),
-                txt_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_aligned.txt'), bc=bc_list),
-                txt_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_unaligned.txt'), bc=bc_list),
+                png_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_aligned.png'), bc=bc_list, masked_flag=masked_list),
+                png_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unaligned.png'), bc=bc_list, masked_flag=masked_list),
+                txt_align = expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_aligned.txt'), bc=bc_list, masked_flag=masked_list),
+                txt_unalign = expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unaligned.txt'), bc=bc_list, masked_flag=masked_list),
             params:
                 rname = "04_qc_report",
                 R = join(source_dir,'workflow','scripts','02_qc_report_unmasked.Rmd'),
@@ -517,26 +573,24 @@ rule talon_db:
     initialize db
     '''
     input:
-        anno = get_annotation_gtf_talon,
+        fa = join(out_dir,"00_tmp","annotation_files","unmasked.fa"),
+        gtf = join(out_dir,"00_tmp","annotation_files","unmasked.gtf"),
     params:
         rname = "05.1_talon_db",
         sing_param = singularity_parameter, 
         doc = talon_conda,
         a_id = annotation_id,
         b_id = build_id,
+        anno_gtf = get_annotation_gtf,
         base = join(out_dir,'05_talon',build_id),
-        anno_name = get_annotation_name_talon,
-        tmp_dir = join(out_dir,'05_talon','tmp')
     output:
-        o1 = join(out_dir,'05_talon',build_id + '.db')
+        o1 = join(out_dir,'05_talon', build_id + '.db')
     envmodules:
         config['singularity'],
     shell:
         '''
-        if [ -w "/lscratch/${{SLURM_JOB_ID}}" ];then tmpdir="/lscratch/${{SLURM_JOB_ID}}";else tmpdir={params.tmp_dir}; mkdir ${{tmpdir}};fi
-        cp {input.anno} "${{tmpdir}}/{params.anno_name}";
         {params.sing_param} {params.doc} talon_initialize_database \
-            --f "${{tmpdir}}/{params.anno_name}" \
+            --f {params.anno_gtf} \
             --a {params.a_id}\
             --g {params.b_id} \
             --o {params.base}
@@ -556,13 +610,14 @@ rule talon_prime:
     --deleteTmp
     '''
     input:
-        f1 = get_talon_input
+        f1 = get_talon_input,
+        db = join(out_dir,'05_talon', build_id + '.db')
     params:
-        rname = "05.2_sam_label",
+        rname = "05.2_talon_prime",
         sing_param = singularity_parameter, 
         doc = talon_conda,
-        anno = get_annotation_gtf_talon,
-        base_tmp = join(out_dir,'tmp' + '_' + '{bc}'),
+        anno_fa = get_annotation_fa,
+        tmp_dir = join(out_dir,"00_tmp","talon_prime", '{bc}'),
         base_sample = join(out_dir,'05_talon','sam_labeled','{bc}'),
         p_len = primer_len, 
     output:
@@ -573,11 +628,10 @@ rule talon_prime:
     shell:
         '''
         {params.sing_param} {params.doc} talon_label_reads --f {input.f1} \
-            --g {params.anno} \
+            --g {params.anno_fa} \
             --t 1 \
             --ar {params.p_len} \
-            --tmpDir={params.base_tmp} \
-            --deleteTmp \
+            --tmpDir={params.tmp_dir} \
             --o {params.base_sample}
         '''
 
@@ -594,7 +648,7 @@ rule talon_annotation:
         sing_param = singularity_parameter, 
         doc = talon_conda,
         b_id = build_id,
-        base_tmp = join(out_dir,'tmp_annotations/'),
+        tmp_dir = join(out_dir,'00_tmp','talon_annotations/'),
         base_sample = join(out_dir,'05_talon','annotate',build_id),
     output:
         o1 = join(out_dir,'05_talon','annotate', build_id + '_talon_read_annot.tsv'),
@@ -608,7 +662,7 @@ rule talon_annotation:
             --db {input.db} \
             --build {params.b_id} \
             --threads 5 \
-            --tmp_dir {params.base_tmp} \
+            --tmp_dir {params.tmp_dir} \
             --o {params.base_sample}
         '''
 
@@ -778,10 +832,10 @@ rule flair_isoforms:
         rname = "06.2_flair_isoforms",
         sing_param = singularity_parameter, 
         doc = flair_conda,
-        anno_fa = get_annotation_path,
+        anno_fa = get_annotation_fa,
         anno_gtf = get_annotation_gtf,
         base = join(out_dir,'06_flair','isoforms','merged_flair'),
-        tmp_dir = join(out_dir,'06_flair','tmp_iso'),
+        tmp_dir = join(out_dir,'00_tmp','tmp_iso'),
     envmodules:
         config['singularity'],
     output:
@@ -850,7 +904,7 @@ rule flair_abundances:
         rname = "06.3_flair_abundances",
         sing_param = singularity_parameter, 
         docs = flair_conda,
-        tmp_dir = join(out_dir,'06_flair','tmp_abund'),
+        tmp_dir = join(out_dir,'00_tmp','tmp_abund'),
         base = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv')
     envmodules:
         config['singularity'],
@@ -874,38 +928,50 @@ rule flair_deg:
     singularity exec -B /scratch/kopardevn,/data/CCBR_Pipeliner /scratch/kopardevn/rbl3_test_out/ccbr_flair_v1.5.sif \
     bash -c "python3 /opt2/flair/bin/diff_iso_usage.py /scratch/kopardevn/rbl3_test_out/fastq/counts_matrix.tsv 
     wt1_wt_b1 ko_drosha1_ko_drosha_b1 /scratch/kopardevn/rbl3_test_out/fastq/diff_iso_ko_drosha.txt"
+
+    alternative diff is for projects with samples > 2 per group
+    - python flair.py diffExp -q counts_matrix.tsv -o output_directory [options]
+    - {params.sing_param} {params.docs} flair.py diffExp -q {input.f1} -o {params.base}
     '''
     input:
-        f1 = join(out_dir,'09_flair','counts_matrix.tsv')
+        f1 = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv')
     params:
-        rname = "create_sam",
+        rname = "06.4_flair_deg",
         sing_param = singularity_parameter, 
         docs = flair_conda,
+        groupid = get_deg_comparisons,
+        base = join(out_dir,'07_deg')
     envmodules:
         config['singularity'],
         config['python'], 
     output:
-        o1 = join(out_dir,'09_flair','diff_iso_{group_id}.txt')
+        o1 = join(out_dir,'07_deg','deg_iso_{group_id}.txt')
     shell:
         '''
-        {params.sing_param} {params.doc} bash -c "python3 diff_iso_usage.py {input.f1} {group_id} {output.o1}"
+        mkdir -p {params.base};
+        {params.sing_param} {params.docs} bash -c "python3 /opt2/flair/bin/diff_iso_usage.py {input.f1} {params.groupid} {output.o1}"
         '''
 
 rule abundance_plots:
     input:
         unfilt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
         filt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
-        flair = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv')
+        flair = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv'),
+        degs = expand(join(out_dir,'07_deg','deg_iso_{group_id}.txt'),group_id=deg_list)
     params:
         rname = "07_abundance_plots",
         R = join(source_dir,"workflow","scripts","03_transcript_types.Rmd"),
-        base = join(out_dir,'07_report'),
+        base = join(out_dir,'08_report'),
+        log = join(out_dir,'log'),
         perc_sim = perc_sim,
+        ref = masked_refs,
+        clean = clean_up,
         num_match = num_match
     envmodules:
         config['R'],
     output:
-        o1 = join(out_dir,'07_report','summary_report.html')
+        o1 = join(out_dir,'08_report','summary_report.html'),
+        o2 = join(out_dir,'08_report','img','filtered_abundance.png')
     shell:
         '''
         Rscript -e 'library(rmarkdown); \
@@ -915,8 +981,12 @@ rule abundance_plots:
                 u_talon_data = "{input.unfilt}", \
                 u_flair_data = "{input.flair}", \
                 output_dir = "{params.base}", \
+                log_dir = "{params.log}", \
                 perc_sim = "{params.perc_sim}", \
-                num_match = "{params.num_match}"))'
+                ref_masking = "{params.ref}", \
+                clean_up = "{params.clean}", \
+                num_match = "{params.num_match}", \
+                deg_list = "{input.degs}"))'
         '''
 
 # rule squanti:
