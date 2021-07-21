@@ -74,7 +74,7 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
     --keep-going \
     --restart-times 1 \
     --printshellcmds \
-    -s ${output_dir}/workflow/${log_time}/00_Snakefile \
+    -s ${output_dir}/log/${log_time}/00_Snakefile \
     --configfile ${output_dir}/log/${log_time}/00_snakemake_config.yaml \
     --cluster-config ${output_dir}/log/${log_time}/00_cluster_config.yml \
     --cluster "sbatch --gres {cluster.gres} --cpus-per-task {cluster.threads} \
@@ -89,7 +89,7 @@ if [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
       --rerun-incomplete \
       --printshellcmds \
       --cores 8 \
-      -s ${output_dir}/workflow/${log_time}/00_Snakefile \
+      -s ${output_dir}/log/${log_time}/00_Snakefile \
       --configfile ${output_dir}/log/${log_time}/00_snakemake_config.yaml \
       --cluster-config ${output_dir}/log/${log_time}/00_cluster_config.yml
   fi
