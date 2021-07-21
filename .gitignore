@@ -136,6 +136,7 @@ talon_tmp/
 
 # remove test_dir
 test_data
+testing/*
 
 #remove unneded dir
 *.DS_Store
