@@ -12,9 +12,9 @@ sample_manifest=config['sampleManifest']
 deg_manifest = config['DEGManifest']
 
 singularity_parameter = 'singularity exec -B /data,/fdb,/scratch,/lscratch,' + out_dir + ',' + source_dir
-talon_conda = config['conda_dir'] + config['talon_conda']
-porechop_conda = config['conda_dir'] + config['porechop_conda']
-flair_conda = config['conda_dir'] + config['flair_conda']
+talon_conda = config['condaDir'] + config['talonConda']
+porechop_conda = config['condaDir'] + config['porechopConda']
+flair_conda = config['condaDir'] + config['flairConda']
 
 #config user params
 masked_refs=config['maskedReference']
