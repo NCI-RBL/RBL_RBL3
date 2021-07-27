@@ -121,7 +121,7 @@ if [[ $pipeline = "initialize" ]]; then
   fi
   
   # copy config inputs to edit
-  files_save=('config/snakemake_config.yaml' 'config/cluster_config.yml' 'config/index_config.yaml')
+  files_save=('config/snakemake_config.yaml' 'config/cluster_config.yml')
 
   for f in ${files_save[@]}; do
     IFS='/' read -r -a strarr <<< "$f"
@@ -135,39 +135,10 @@ elif [[ $pipeline = "cluster" ]] || [[ $pipeline = "local" ]]; then
   #parse config
   eval $(parse_yaml ${output_dir}/snakemake_config.yaml "config_")
   source_dir=$(echo $config_sourceDir | sed 's:/*$::')
-  eval $(parse_yaml ${output_dir}/index_config.yaml "yaml_")
   
   #run checks
   check_initialization
   check_output_dir
-
-  if [[ $config_reference == "hg38" ]]; then
-    check_readaccess "${yaml_hg38_std}"
-    check_readaccess "${yaml_hg38_spliceawareunmasked_50bp}"
-    check_readaccess "${yaml_hg38_spliceawareunmasked_75bp}"
-    check_readaccess "${yaml_hg38_spliceawaremasked_50bp}"
-    check_readaccess "${yaml_hg38_spliceawaremasked_75bp}"
-    check_readaccess "${yaml_hg38_gencodepath}"
-    check_readaccess "${yaml_hg38_refseqpath}"
-    check_readaccess "${yaml_hg38_canonicalpath}"
-    check_readaccess "${yaml_hg38_intronpath}"
-    check_readaccess "${yaml_hg38_rmskpath}"
-    check_readaccess "${yaml_hg38_sypath}"
-    check_readaccess "${yaml_hg38_aliaspath}"
-  else
-    check_readaccess "${yaml_mm10_std}"
-    check_readaccess "${yaml_mm10_spliceawareunmasked_50bp}"
-    check_readaccess "${yaml_mm10_spliceawareunmasked_75bp}"
-    check_readaccess "${yaml_mm10_spliceawaremasked_50bp}"
-    check_readaccess "${yaml_mm10_spliceawaremasked_75bp}"
-    check_readaccess "${yaml_mm10_gencodepath}"
-    check_readaccess "${yaml_mm10_refseqpath}"
-    check_readaccess "${yaml_mm10_canonicalpath}"
-    check_readaccess "${yaml_mm10_intronpath}"
-    check_readaccess "${yaml_mm10_rmskpath}"
-    check_readaccess "${yaml_mm10_sypath}"
-    check_readaccess "${yaml_mm10_aliaspath}"
-  fi
 
   #create run log dir
   mkdir "${output_dir}/log/${log_time}"
