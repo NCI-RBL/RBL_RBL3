@@ -26,11 +26,11 @@ percentSimilarity: 20 #lowest percentage of A in the 20bp interval after alignme
 numberMatches: 5 #least number of matched reads in replicates [Default: 5]
 
 #ref files
-annotationGTF: "/data/CCBR_Pipeliner/Talon_Flair/dependencies/gencode.v30.annotation.gtf"
-annotationFA: "/data/CCBR_Pipeliner/Talon_Flair/dependencies/hg38_cleanheader.fa"
+annotationGTF: "/data/RBL_NCI/Pipelines/Talon_Flair/dependencies/gencode.v30.annotation.gtf"
+annotationFA: "/data/RBL_NCI/Pipelines/Talon_Flair/dependencies/hg38_cleanheader.fa"
 
-annotationGTFmasked: "/data/CCBR_Pipeliner/Talon_Flair/dependencies/masked_dgcr8/DGCR8.gtf"
-annotationFAmasked: "/data/CCBR_Pipeliner/Talon_Flair/dependencies/masked_dgcr8/DGCR8.fa"
+annotationGTFmasked: "/data/RBL_NCI/Pipelines/Talon_Flair/dependencies/masked_dgcr8/DGCR8.gtf"
+annotationFAmasked: "/data/RBL_NCI/Pipelines/Talon_Flair/dependencies/masked_dgcr8/DGCR8.fa"
 
 #modules, container parameters
 condaDir: "/data/CCBR_Pipeliner/Talon_Flair/conda_envs/"
