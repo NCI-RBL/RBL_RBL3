@@ -5,11 +5,11 @@ import yaml
 import csv
 
 #config dir
-source_dir = config['source_dir']
-out_dir = config['output_dir'].rstrip('/') + '/'
-fastq_dir = config['fastq_dir'].rstrip('/') + '/'
-sample_manifest=config['sample_manifest']
-deg_manifest = config['deg_manifest']
+source_dir = config['sourceDir']
+out_dir = config['outputDir'].rstrip('/') + '/'
+fastq_dir = config['fastqDir'].rstrip('/') + '/'
+sample_manifest=config['sampleManifest']
+deg_manifest = config['DEGManifest']
 
 singularity_parameter = 'singularity exec -B /data,/fdb,/scratch,/lscratch,' + out_dir + ',' + source_dir
 talon_conda = config['conda_dir'] + config['talon_conda']
@@ -17,17 +17,17 @@ porechop_conda = config['conda_dir'] + config['porechop_conda']
 flair_conda = config['conda_dir'] + config['flair_conda']
 
 #config user params
-masked_refs=config['masked_reference']
-clean_up=config['clean_transcripts']
-annotation_id=config['annotation_id']
-build_id=config['build_id']
+masked_refs=config['maskedReference']
+clean_up=config['cleanTranscripts']
+annotation_id=config['annotationID']
+build_id=config['buildID']
 maxFracA=config['maxFracA']
 minCount=config['minCount']
 minDatasets=config['minDatasets']
-platform_id=config['platform_id']
-primer_len=config['primer_length']
-perc_sim = config['percent_similarity']
-num_match = config['number_of_matches']
+platform_id=config['platformID']
+primer_len=config['primerLength']
+perc_sim = config['percentSimilarity']
+num_match = config['numberMatches']
 
 ###############################################################
 # functions
@@ -273,8 +273,8 @@ rule copy_annotation_unmasked:
     create local instance of annotation files to be removed upon pipeline completion
     '''
      input:
-        fa = config['annotation_fa'],
-        gtf = config['annotation_gtf']
+        fa = config['annotationFA'],
+        gtf = config['annotationGTF']
     params:
         rname = "01_copy_annotation_unmasked",
         base = join(out_dir,"00_annotation_files")
@@ -293,8 +293,8 @@ if (masked_refs=="Y"):
         create local instance of annotation files to be removed upon pipeline completion
         '''
         input:
-            fa = config['annotation_fa_masked'],
-            gtf = config['annotation_gtf_masked']
+            fa = config['annotationFAmasked'],
+            gtf = config['annotationGTFmasked']
         params:
             rname = "01_copy_annotation_masked",
             base = join(out_dir,"00_annotation_files")
