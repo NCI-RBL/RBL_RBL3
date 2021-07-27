@@ -139,7 +139,7 @@ def get_deg_list():
             
             #for each individual id
             for id in group:
-                id = id.replace("  ", "_")
+                id = id.replace(",", "_")
             
             #append final list
             deg_list.append(id)
