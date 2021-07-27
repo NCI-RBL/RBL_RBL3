@@ -5,22 +5,22 @@ description: snakemake configuration file
 type: object
 
 properties:
-  source_dir:
+  sourceDir:
     type: string
     description: /path/to/talon_flair/dir
-  output_dir:
+  outputDir:
     type: string
     description: /path/to/output/dir
-  sample_manifest:
+  sampleManifest:
     type: string
     description: /path/to/sample/manifest
-  deg_manifest:
+  DEGManifest:
     type: string
     description: /path/to/deg/manifest
-  fastq_dir:
+  fastqDir:
     type: string
     description: /path/to/fastq/files
-  clean_transcripts:
+  cleanTranscripts:
     types: string
     enum: ["Y","N","y","n"]
     description: determine whether or not run TranscriptClean
@@ -33,31 +33,31 @@ properties:
   minDatasets:
     type: number
     description: Minimum number of datasets novel transcripts must be found in
-  primer_length:
+  primerLength:
     type: number
     description: match the length of the T sequence in your primer
-  percent_similarity:
+  percentSimilarity:
     type: number
     description: lowest percentage of A in the 20bp interval after alignment
-  number_of_matches:
+  numberMatches:
     type: number
     description: least number of matched reads in replicates
-  conda_dir:
+  condaDir:
     type: string
     description: /path/to/conda/
 
 # entries that have to be in the config file for successful validation
 required:
-  - source_dir
-  - output_dir
-  - sample_manifest
-  - deg_manifest
-  - fastq_dir
-  - clean_transcripts
+  - sourceDir
+  - outputDir
+  - sampleManifest
+  - DEGManifest
+  - fastqDir
+  - cleanTranscripts
   - maxFracA
   - minCount
   - minDatasets
-  - primer_length
-  - percent_similarity
-  - number_of_matches
-  - conda_dir
+  - primerLength
+  - percentSimilarity
+  - numberMatches
+  - condaDir
