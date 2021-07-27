@@ -1,6 +1,6 @@
 # Global configuration file for the pipeline
 #path to rbl3 directory
-sourceDir: "/path/to/rbl3/repo/"
+sourceDir: "ls /data/RBL_NCI/Pipelines/Talon_Flair/v1.0/RBL_RBL3/"
 
 #path to output directory
 outputDir: "/path/to/output/dir/"
