@@ -33,7 +33,7 @@ annotationGTFmasked: "/data/RBL_NCI/Pipelines/Talon_Flair/dependencies/masked_dg
 annotationFAmasked: "/data/RBL_NCI/Pipelines/Talon_Flair/dependencies/masked_dgcr8/DGCR8.fa"
 
 #modules, container parameters
-condaDir: "/data/CCBR_Pipeliner/Talon_Flair/conda_envs/"
+condaDir: "/data/RBL_NCI/Pipelines/Talon_Flair/conda_envs/"
 talonConda: "talon_0416.sif"
 porechopConda: "porechop_0.2.4.sif"
 flairConda: "ccbr_flair_v1.5.sif"
