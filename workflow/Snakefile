@@ -232,6 +232,7 @@ rule all:
         join(out_dir,'05_talon','counts', build_id + '_whitelist.txt'),
         join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
         join(out_dir,'05_talon','gtf', build_id + '_talon.gtf'),
+        expand(join(out_dir,'05_talon','transcript_filtered','{bc}_Known.bam'),bc=bc_list),
 
         #flair
         join(out_dir,'06_flair','merged.fastq.gz'),
@@ -783,6 +784,48 @@ rule talon_gtf:
             --build {params.b_id} \
             --o {params.base}
         '''
+
+if (masked_refs == "Y"):
+    rule create_masked_outputs:
+        '''
+        http://broadinstitute.github.io/picard/command-line-overview.html#FilterSamReads
+
+        Using talon annotations, BAM files are created for the transcript_novelty category. The following
+        are categories that can be found in a sample: Antisense, Genomic, ISM, Known, NIC, NNC
+    '''
+        input:
+            anno = join(out_dir,'05_talon','annotate', build_id + '_talon_read_annot.tsv'),
+            sam = join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam')
+        params:
+            rname = "todo",
+            base = join(out_dir,'05_talon','transcript_filtered','{bc}_')
+        envmodules:
+            config['java'],
+            config['picard'],
+            config['samtools'],
+        output:
+            bam = temp(join(out_dir,'05_talon','transcript_filtered','{bc}_labeled.bam')),
+            cat_list = temp(join(out_dir,'05_talon','transcript_filtered','{bc}_category_list.txt')),
+            filt = join(out_dir,'05_talon','transcript_filtered','{bc}_Known.bam'),
+        shell:
+            """
+            #determine which transcript categories are present in samples, skip header
+            awk '(NR>1)' {input.anno} | cut -f17 - | sort | uniq > {output.cat_list};
+
+            #create bam
+            samtools view -bS {input.sam}> {output.bam};
+
+            #create read list, create subset bam file
+            while read p; do \
+                cat {input.anno} | awk -v p="$p" '$17 == '"p"'' | cut -f1 > {params.base}${{p}}_readlist.txt;
+
+                java -jar $PICARDJARPATH/picard.jar FilterSamReads \
+                    I={output.bam} \
+                    O={params.base}${{p}}.bam \
+                    READ_LIST_FILE={params.base}${{p}}_readlist.txt \
+                    FILTER=includeReadList
+            done <{output.cat_list};            
+            """
 
 rule merge_fq:
     '''
