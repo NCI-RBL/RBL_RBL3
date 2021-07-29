@@ -940,14 +940,14 @@ rule flair_deg:
         {params.sing_param} {params.docs} bash -c "python3 /opt2/flair/bin/diff_iso_usage.py {input.f1} {params.groupid} {output.o1}"
         '''
 
-rule abundance_plots:
+rule final_report:
     input:
         unfilt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
         filt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
         flair = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv'),
         degs = expand(join(out_dir,'07_deg','deg_iso_{group_id}.txt'),group_id=deg_list)
     params:
-        rname = "07_abundance_plots",
+        rname = "07_final_report",
         R = join(source_dir,"workflow","scripts","03_transcript_types.Rmd"),
         base = join(out_dir,'08_report'),
         log = join(out_dir,'log'),
