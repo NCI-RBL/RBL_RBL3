@@ -205,9 +205,9 @@ rule all:
         input_annotation,
 
         #input fastq files
-        #expand(join(fastq_dir,'{bc}.fastq'),bc=bc_list),
-        #expand(join(out_dir,'01_fastq','{bc}.fastq.gz'),bc=bc_list),
-        #xpand(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'),bc=bc_list),
+        expand(join(fastq_dir,'{bc}.fastq'),bc=bc_list),
+        expand(join(out_dir,'01_fastq','{bc}.fastq.gz'),bc=bc_list),
+        expand(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'),bc=bc_list),
 
         #sam files
         input_sam,
@@ -1024,33 +1024,3 @@ rule final_report:
                 num_match = "{params.num_match}", \
                 deg_list = "{input.degs}"))'
         '''
-
-# rule squanti:
-#     '''
-#     remove params: 
-#     --polyA_motif_list  polyA.list
-#     --cage_peak {params.cage} \
-
-#     for short read data only:
-#     --expression rsemQuantification.chr13.isoforms.results
-#     -c star.SJ.out.tab \
-    
-#     sqanti3_qc.py --gtf {input.gtf} {params.anno} --fl_count {input.counts} --isoAnnotLite --gff3 {params.gff}
-
-#     '''
-#     input:
-#         gtf = join(out_dir,'05_talon','gtf', build_id + '_talon.gtf'),
-#         counts = join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv')
-#     params:
-#         rname = "11_sqanti",
-#         anno = anno_gtf + " " + anno_fa,
-#         gff = anno_gff
-#     container: "docker://nciccbr/ccbr_sqanti_3:latest"
-#     output:
-#         o1 = join(out_dir,'tbd')
-#     shell:
-#         '''
-#         sqanti3_qc.py --gtf /data/sevillas2/rbl3/09_gtf/SIRV_talon.gtf /data/CCBR_Pipeliner/db/PipeDB/Indices/GTFs/hg38/gencode.v30.annotation.gtf \
-#             /data/CCBR_Pipeliner/db/PipeDB/Indices/hg38_30/ref.fa --fl_count /data/sevillas2/rbl3/08_counts/SIRV_talon_abundance_filtered.tsv \
-#             --isoAnnotLite --gff3 /data/CCBR/projects/rbl3/dependencies/Homo_sapiens_GRCh38_Ensembl_86.gff3
-#         '''
