@@ -35,7 +35,7 @@ num_match = config['numberMatches']
 #annotation FA with wildcards
 #if wildcards are used for bc, check if masking is required 
 def get_annotation_fa(wildcards):
-    if hasattr('wildcards', 'masked_flag'):
+    if hasattr(wildcards, 'masked_flag'):
         if (wildcards.masked_flag == "masked"):
             anno_file=join(out_dir,"00_tmp","annotation_files","masked.fa")
         else:
@@ -58,16 +58,10 @@ def get_bam_input(wildcards):
 
 #annotation GTF with wildcards
 def get_annotation_gtf(wildcards):
-    if hasattr('wildcards', 'masked_flag'):
-        if (wildcards.masked_flag == "masked"):
-            anno_file=join(out_dir,"00_tmp","annotation_files","masked.gtf")
-        else:
-            anno_file=join(out_dir,"00_tmp","annotation_files","unmasked.gtf")
+    if (masked_refs == "Y"):
+        anno_file=join(out_dir,"00_tmp","annotation_files","masked.gtf")
     else:
-        if (masked_refs == "Y"):
-            anno_file=join(out_dir,"00_tmp","annotation_files","masked.gtf")
-        else:
-            anno_file=join(out_dir,"00_tmp","annotation_files","unmasked.gtf")
+        anno_file=join(out_dir,"00_tmp","annotation_files","unmasked.gtf")
     return(anno_file)
 
 #talon config
@@ -210,40 +204,41 @@ rule all:
         #input annotation files
         input_annotation,
 
-        #input fastq files
-        expand(join(fastq_dir,'{bc}.fastq'),bc=bc_list),
-        expand(join(out_dir,'01_fastq','{bc}.fastq.gz'),bc=bc_list),
-        expand(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'),bc=bc_list),
+        # #input fastq files
+        # expand(join(fastq_dir,'{bc}.fastq'),bc=bc_list),
+        # expand(join(out_dir,'01_fastq','{bc}.fastq.gz'),bc=bc_list),
+        # expand(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'),bc=bc_list),
 
-        #sam files
-        input_sam,
+        # #sam files
+        # input_sam,
 
         #bam files
         expand(join(out_dir,'03_bam','{bc}_{masked_flag}.sorted.bam'),bc=bc_list, masked_flag=masked_list),
 
         #qc
-        expand(join(out_dir, '04_qc','fastqc','{bc}_fastqc.html'), bc=bc_list),
-        expand(join(out_dir, '04_qc','samtools','{bc}_{masked_flag}_samstats.txt'), bc=bc_list, masked_flag=masked_list),
+        # expand(join(out_dir, '04_qc','fastqc','{bc}_fastqc.html'), bc=bc_list),
+        # expand(join(out_dir, '04_qc','samtools','{bc}_{masked_flag}_samstats.txt'), bc=bc_list, masked_flag=masked_list),
         join(out_dir,'04_qc','multiqc_report.html'),
-        expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_align_len.txt'), bc=bc_list, masked_flag=masked_list),
+        # expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_align_len.txt'), bc=bc_list, masked_flag=masked_list),
         join(out_dir,'04_qc','qc_report.html'),
         
         #talon
         join(out_dir,'05_talon', 'talon_config.csv'),
-        join(out_dir,'05_talon', build_id + '.db'),
-        expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
+        # join(out_dir,'05_talon', build_id + '.db'),
+        # expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
         join(out_dir,'05_talon','annotate', build_id + '_talon_read_annot.tsv'),
         join(out_dir,'05_talon','counts', build_id + '_talon_summary.tsv'),
         join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
         join(out_dir,'05_talon','counts', build_id + '_whitelist.txt'),
         join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
         join(out_dir,'05_talon','gtf', build_id + '_talon.gtf'),
-
+        expand(join(out_dir,'05_talon','transcript_filtered','{bc}_category_list.txt'),bc=bc_list),
+        
         #flair
-        join(out_dir,'06_flair','merged.fastq.gz'),
-        join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa'),
+        # join(out_dir,'06_flair','merged.fastq.gz'),
+        # join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa'),
         join(out_dir,'06_flair','flair_config.csv'),
-        expand(join(out_dir,'06_flair','fastq','{bc}.fastq'),bc=bc_list),
+        # expand(join(out_dir,'06_flair','fastq','{bc}.fastq'),bc=bc_list),
         join(out_dir,'06_flair','counts','flair_counts_matrix.tsv'),
         expand(join(out_dir,'07_deg','deg_iso_{group_id}.txt'),group_id=deg_list),
 
@@ -252,12 +247,6 @@ rule all:
 
         # #squanti
         # #join(out_dir,'tbd'),
-
-        #collapsed files
-        #expand(join(out_dir,'collapsed','{bc}.collapsed.gff'),bc=bc_list),
-        #expand(join(out_dir,'collapsed','{bc}.collapsed.rep.fq'),bc=bc_list),
-        #expand(join(out_dir,'collapsed','{bc}.collapsed.group.txt'),bc=bc_list),
-        #expand(join(out_dir,'collapsed','{bc}.ignored_ids.txt'),bc=bc_list),
 
 #common and other SMK 
 if source_dir == "":
@@ -316,7 +305,7 @@ rule handle_fastq:
     params:
         rname = "01_fq",
     output:
-        zip = join(out_dir,'01_fastq','{bc}.fastq.gz')
+        zip = temp(join(out_dir,'01_fastq','{bc}.fastq.gz'))
     shell:
         """
         gzip -c {input.f1} > {output.zip}
@@ -335,7 +324,7 @@ rule adaptor_trim:
     envmodules:
         config['singularity'],
     output:
-        o1 = join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz')
+        o1 = temp(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'))
     shell:
         '''
         {params.sing_param} {params.doc} porechop -i {input.f1} -o {output.o1} -t 2
@@ -358,8 +347,8 @@ rule create_sam:
         config['minimap2'],
         config['samtools']
     output:
-        sam = join(out_dir,'02_sam','{bc}_{masked_flag}.sam'),
-        sorted = join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam')
+        sam = temp(join(out_dir,'02_sam','{bc}_{masked_flag}.sam')),
+        sorted = temp(join(out_dir,'02_sam','{bc}_{masked_flag}.sorted.sam'))
     shell:
         '''
         minimap2 \
@@ -387,7 +376,7 @@ if (clean_up=="Y"):
         envmodules:
             config['singularity'],
         output:
-            o1 = join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted_clean.sam')
+            o1 = temp(join(out_dir,'02_sam_corrected','{bc}_{masked_flag}.sorted_clean.sam'))
         shell:
             '''
             {params.sing_param} {params.doc} TranscriptClean.py --sam {input.f1} --genome {params.anno_fa} \
@@ -402,7 +391,7 @@ rule create_bam:
     envmodules:
         config['samtools']
     output:
-        bam = join(out_dir,'03_bam','{bc}_{masked_flag}.bam'),
+        bam = temp(join(out_dir,'03_bam','{bc}_{masked_flag}.bam')),
         sorted = join(out_dir, '03_bam','{bc}_{masked_flag}.sorted.bam')
     shell:
         """
@@ -423,7 +412,7 @@ rule qc_fastq:
     envmodules:
         config['fastqc']
     output:
-        o1 = join(out_dir, '04_qc','fastqc','{bc}_fastqc.html')
+        o1 = temp(join(out_dir, '04_qc','fastqc','{bc}_fastqc.html'))
     shell:
         """
         fastqc {input.fq} -o {params.base}
@@ -442,7 +431,7 @@ rule qc_samstats:
     envmodules:
         config['samtools']
     output:
-        o1 = join(out_dir, '04_qc','samtools','{bc}_{masked_flag}_samstats.txt')
+        o1 = temp(join(out_dir, '04_qc','samtools','{bc}_{masked_flag}_samstats.txt'))
     shell:
         """
         samtools view -h {input.f1} | samtools stats - > {output.o1}
@@ -489,12 +478,12 @@ rule qc_alignment:
         config['samtools'],
         config['R']
     output:
-        bam_a = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_align_len.txt'),
-        bam_u = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unalign_len.txt'),
-        png_align = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_aligned.png'),
-        png_unalign = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unaligned.png'),
-        txt_align = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_aligned.txt'),
-        txt_unalign = join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unaligned.txt'),
+        bam_a = temp(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_align_len.txt')),
+        bam_u = temp(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unalign_len.txt')),
+        png_align = temp(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_aligned.png')),
+        png_unalign = temp(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unaligned.png')),
+        txt_align = temp(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_aligned.txt')),
+        txt_unalign = temp(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_unaligned.txt')),
     shell:
         """
         samtools view -F 4 {input.f1} | awk '{{print length($10)}}' > {output.bam_a}; \
@@ -584,7 +573,7 @@ rule talon_db:
         anno_gtf = get_annotation_gtf,
         base = join(out_dir,'05_talon',build_id),
     output:
-        o1 = join(out_dir,'05_talon', build_id + '.db')
+        o1 = temp(join(out_dir,'05_talon', build_id + '.db'))
     envmodules:
         config['singularity'],
     shell:
@@ -621,8 +610,8 @@ rule talon_prime:
         base_sample = join(out_dir,'05_talon','sam_labeled','{bc}'),
         p_len = primer_len, 
     output:
-        o1 = join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),
-        o2 = join(out_dir,'05_talon','sam_labeled','{bc}_read_labels.tsv'),
+        o1 = temp(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam')),
+        o2 = temp(join(out_dir,'05_talon','sam_labeled','{bc}_read_labels.tsv')),
     envmodules:
         config['singularity'],
     shell:
@@ -796,6 +785,53 @@ rule talon_gtf:
             --o {params.base}
         '''
 
+if (masked_refs == "Y"):
+    rule create_masked_outputs:
+        '''
+        http://broadinstitute.github.io/picard/command-line-overview.html#FilterSamReads
+
+        Using talon annotations, BAM files are created for the transcript_novelty category. The following
+        are categories that can be found in a sample: Antisense, Genomic, ISM, Known, NIC, NNC
+    '''
+        input:
+            anno = join(out_dir,'05_talon','annotate', build_id + '_talon_read_annot.tsv'),
+            sam = join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam')
+        params:
+            rname = "todo",
+            base = join(out_dir,'05_talon','transcript_filtered','{bc}_')
+        envmodules:
+            config['java'],
+            config['picard'],
+            config['samtools'],
+            config['bedtools']
+        output:
+            bam = temp(join(out_dir,'05_talon','transcript_filtered','{bc}_labeled.bam')),
+            cat_list = temp(join(out_dir,'05_talon','transcript_filtered','{bc}_category_list.txt')),
+        shell:
+            """
+            #determine which transcript categories are present in samples, skip header
+            awk '(NR>1)' {input.anno} | cut -f17 - | sort | uniq > {output.cat_list};
+
+            #create bam
+            samtools view -bS {input.sam}> {output.bam};
+
+            #create read list, create subset bam file, sam file 
+            while read p; do \
+                cat {input.anno} | awk -v p="$p" '$17 == '"p"'' | cut -f1 > {params.base}${{p}}_readlist.txt;
+
+                java -jar $PICARDJARPATH/picard.jar FilterSamReads \
+                    I={output.bam} \
+                    O={params.base}${{p}}.bam \
+                    READ_LIST_FILE={params.base}${{p}}_readlist.txt \
+                    FILTER=includeReadList;
+
+                samtools view -h -o {params.base}${{p}}.sam {params.base}${{p}}.bam;
+
+                bedtools bamtofastq -i {params.base}${{p}}.bam -fq {params.base}${{p}}.fastq;
+            done <{output.cat_list};
+  
+            """
+
 rule merge_fq:
     '''
     '''
@@ -805,7 +841,7 @@ rule merge_fq:
         rname = "06.1_flair_merge",
         base = join(out_dir,'01_fastq_trimmed')
     output:
-        o1 = join(out_dir,'06_flair','merged.fastq.gz')
+        o1 = temp(join(out_dir,'06_flair','merged.fastq.gz'))
     shell:
         '''
         zcat {params.base}/*.fastq.gz | gzip -n -> {output.o1}
@@ -839,14 +875,14 @@ rule flair_isoforms:
     envmodules:
         config['singularity'],
     output:
-        o1 = join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa'),
-        o2 = join(out_dir,'06_flair','isoforms','merged_flair.isoforms.gtf'),
-        o3 = join(out_dir,'06_flair','isoforms','merged_flair_all_corrected.bed'),
-        o4 = join(out_dir,'06_flair','isoforms','merged_flair_all_inconsistent.bed'),
-        o5 = join(out_dir,'06_flair','isoforms','merged_flair.bam'),
-        o6 = join(out_dir,'06_flair','isoforms','merged_flair.bed'),
-        o7 = join(out_dir,'06_flair','isoforms','merged_flair.isoforms.bed'),
-        o8 = join(out_dir,'06_flair','isoforms','merged_flair.sam'),
+        o1 = temp(join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa')),
+        o2 = temp(join(out_dir,'06_flair','isoforms','merged_flair.isoforms.gtf')),
+        o3 = temp(join(out_dir,'06_flair','isoforms','merged_flair_all_corrected.bed')),
+        o4 = temp(join(out_dir,'06_flair','isoforms','merged_flair_all_inconsistent.bed')),
+        o5 = temp(join(out_dir,'06_flair','isoforms','merged_flair.bam')),
+        o6 = temp(join(out_dir,'06_flair','isoforms','merged_flair.bed')),
+        o7 = temp(join(out_dir,'06_flair','isoforms','merged_flair.isoforms.bed')),
+        o8 = temp(join(out_dir,'06_flair','isoforms','merged_flair.sam')),
     shell:
         '''
         {params.sing_param} {params.doc} flair.py 123 -g {params.anno_fa} \
@@ -877,7 +913,7 @@ rule flair_fastq:
     params:
         zip = join(out_dir,'06_flair','fastq','{bc}.fastq.gz')
     output:
-        o1 = join(out_dir,'06_flair','fastq','{bc}.fastq')
+        o1 = temp(join(out_dir,'06_flair','fastq','{bc}.fastq'))
     shell:
         '''
         cp {input.f1} {params.zip}; \
@@ -952,14 +988,14 @@ rule flair_deg:
         {params.sing_param} {params.docs} bash -c "python3 /opt2/flair/bin/diff_iso_usage.py {input.f1} {params.groupid} {output.o1}"
         '''
 
-rule abundance_plots:
+rule final_report:
     input:
         unfilt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
         filt = join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
         flair = join(out_dir,'06_flair','counts','flair_counts_matrix.tsv'),
         degs = expand(join(out_dir,'07_deg','deg_iso_{group_id}.txt'),group_id=deg_list)
     params:
-        rname = "07_abundance_plots",
+        rname = "07_final_report",
         R = join(source_dir,"workflow","scripts","03_transcript_types.Rmd"),
         base = join(out_dir,'08_report'),
         log = join(out_dir,'log'),
@@ -988,33 +1024,3 @@ rule abundance_plots:
                 num_match = "{params.num_match}", \
                 deg_list = "{input.degs}"))'
         '''
-
-# rule squanti:
-#     '''
-#     remove params: 
-#     --polyA_motif_list  polyA.list
-#     --cage_peak {params.cage} \
-
-#     for short read data only:
-#     --expression rsemQuantification.chr13.isoforms.results
-#     -c star.SJ.out.tab \
-    
-#     sqanti3_qc.py --gtf {input.gtf} {params.anno} --fl_count {input.counts} --isoAnnotLite --gff3 {params.gff}
-
-#     '''
-#     input:
-#         gtf = join(out_dir,'05_talon','gtf', build_id + '_talon.gtf'),
-#         counts = join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv')
-#     params:
-#         rname = "11_sqanti",
-#         anno = anno_gtf + " " + anno_fa,
-#         gff = anno_gff
-#     container: "docker://nciccbr/ccbr_sqanti_3:latest"
-#     output:
-#         o1 = join(out_dir,'tbd')
-#     shell:
-#         '''
-#         sqanti3_qc.py --gtf /data/sevillas2/rbl3/09_gtf/SIRV_talon.gtf /data/CCBR_Pipeliner/db/PipeDB/Indices/GTFs/hg38/gencode.v30.annotation.gtf \
-#             /data/CCBR_Pipeliner/db/PipeDB/Indices/hg38_30/ref.fa --fl_count /data/sevillas2/rbl3/08_counts/SIRV_talon_abundance_filtered.tsv \
-#             --isoAnnotLite --gff3 /data/CCBR/projects/rbl3/dependencies/Homo_sapiens_GRCh38_Ensembl_86.gff3
-#         '''

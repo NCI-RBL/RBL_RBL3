@@ -2,15 +2,15 @@
 output: html_document
 params:
   f_talon_data: 
-    value: "~/../../Volumes/sevillas2/rbl3_test3/05_talon/counts/SIRV_talon_abundance_filtered.tsv"
+    value: "~/../../Volumes/dgcr8demo/05_talon/counts/SIRV_talon_abundance_filtered.tsv"
   u_talon_data: 
-    value: "~/../../Volumes/sevillas2/rbl3_test3/05_talon/counts/SIRV_talon_abundance.tsv"
+    value: "~/../../Volumes/dgcr8demo/05_talon/counts/SIRV_talon_abundance.tsv"
   u_flair_data: 
-    value: "~/../../Volumes/sevillas2/rbl3_test3/06_flair/counts/flair_counts_matrix.tsv"
+    value: "~/../../Volumes/dgcr8demo/06_flair/counts/flair_counts_matrix.tsv"
   output_dir:
-    value: "~/../../Volumes/sevillas2/rbl3_test3/08_report"
+    value: "~/../../Volumes/dgcr8demo/08_report"
   log_dir:
-    value: "~/../../Volumes/sevillas2/rbl3_test3/log"
+    value: "~/../../Volumes/dgcr8demo/log"
   perc_sim:
     value: 20
   num_match:
@@ -20,7 +20,7 @@ params:
   clean_up:
     value: "Y"
   deg_list:
-    value: "~/../../Volumes/sevillas2/rbl3_test3/07_deg/deg_iso_wt_ko.dicer.txt ~/../../Volumes/sevillas2/rbl3_test3/07_deg/deg_iso_wt_ko.drosha.txt"
+    value: "~/../../Volumes/dgcr8demo/07_deg/deg_iso_wt_ko.dicer.txt ~/../../Volumes/dgcr8demo/07_deg/deg_iso_wt_ko.drosha.txt"
 editor_options: 
   chunk_output_type: console
 ---
@@ -55,12 +55,31 @@ For complete workflow documentation, review the [Wiki](https://github.com/RBL-NC
 
 Both parameters will impact the results below. For more detailed information on the parameters, review the snakemake_config.yaml file within the ``r params$log_dir`` directory.
 
+## Transcript Type
+### Talon data
+ **TALON identified transcripts are summarized prior to filtering by type, with the following key:**
 
+* ISM: incomplete splice match
+
+* NIC: novel in catalog
+
+* NNC: novel not in catalog
+
+Two files are generated, including:
+
+* A counts matrix was created, located at ```r talon_unfiltered_data```, which is previewed below:
+```{r, echo=FALSE, message=FALSE}
+#text files
+talon_df = read.csv(talon_unfiltered_data,sep="\t")
+kable(head(talon_df))
+```
+
+* A transcript summary was generated from this unfiltered data, log10 transformed:
 ```{r, echo=FALSE}
 #plot transcript read lengths, read counts, exon counts
 TranscriptFeatures <- function(df_in,title_in,type_in) {
   abund_df = read.csv(df_in,sep="\t")
-  
+
   p1 = ggplot(abund_df, aes(x=transcript_novelty, y=length, fill=transcript_novelty)) + 
     geom_violin(trim=FALSE)+
     geom_boxplot(width=0.1, fill="white")+
@@ -81,7 +100,7 @@ TranscriptFeatures <- function(df_in,title_in,type_in) {
   transcript_nov = aggregate(get(colnames(abund_df[12]))~transcript_novelty,abund_df,sum)
   colnames(transcript_nov)[2] <- colnames(abund_df[12])
   
-  for (i in range(13:ncol(abund_df))){
+  for (i in (13:ncol(abund_df))){
     transcript_nov[,colnames(abund_df[i])] = aggregate(get(colnames(abund_df[i]))
                                                            ~transcript_novelty,abund_df,sum)[2]
     
@@ -118,29 +137,7 @@ TranscriptFeatures <- function(df_in,title_in,type_in) {
   #save plot
   ggsave(paste0(out_dir,"/img/",type_in,".png"),p_final)
 } 
-```
 
-## Transcript Type
-### Talon data
- **TALON identified transcripts are summarized prior to filtering by type, with the following key:**
-
-* ISM: incomplete splice match
-
-* NIC: novel in catalog
-
-* NNC: novel not in catalog
-
-Two files are generated, including:
-
-* A counts matrix was created, located at ```r talon_unfiltered_data```, which is previewed below:
-```{r, echo=FALSE, message=FALSE}
-#text files
-talon_df = read.csv(talon_unfiltered_data,sep="\t")
-kable(head(talon_df))
-```
-
-* A transcript summary was generated from this unfiltered data, log10 transformed:
-```{r, echo=FALSE, message=FALSE}
 #png files
 TranscriptFeatures(talon_unfiltered_data,"    Unfiltered Data","unfiltered_abundance")
 ```
