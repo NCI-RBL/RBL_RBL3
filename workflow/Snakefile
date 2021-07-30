@@ -204,28 +204,28 @@ rule all:
         #input annotation files
         input_annotation,
 
-        #input fastq files
-        expand(join(fastq_dir,'{bc}.fastq'),bc=bc_list),
-        expand(join(out_dir,'01_fastq','{bc}.fastq.gz'),bc=bc_list),
-        expand(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'),bc=bc_list),
+        # #input fastq files
+        # expand(join(fastq_dir,'{bc}.fastq'),bc=bc_list),
+        # expand(join(out_dir,'01_fastq','{bc}.fastq.gz'),bc=bc_list),
+        # expand(join(out_dir,'01_fastq_trimmed','{bc}.fastq.gz'),bc=bc_list),
 
-        #sam files
-        input_sam,
+        # #sam files
+        # input_sam,
 
         #bam files
         expand(join(out_dir,'03_bam','{bc}_{masked_flag}.sorted.bam'),bc=bc_list, masked_flag=masked_list),
 
         #qc
-        expand(join(out_dir, '04_qc','fastqc','{bc}_fastqc.html'), bc=bc_list),
-        expand(join(out_dir, '04_qc','samtools','{bc}_{masked_flag}_samstats.txt'), bc=bc_list, masked_flag=masked_list),
+        # expand(join(out_dir, '04_qc','fastqc','{bc}_fastqc.html'), bc=bc_list),
+        # expand(join(out_dir, '04_qc','samtools','{bc}_{masked_flag}_samstats.txt'), bc=bc_list, masked_flag=masked_list),
         join(out_dir,'04_qc','multiqc_report.html'),
-        expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_align_len.txt'), bc=bc_list, masked_flag=masked_list),
+        # expand(join(out_dir, '04_qc', 'alignment','{bc}_{masked_flag}_align_len.txt'), bc=bc_list, masked_flag=masked_list),
         join(out_dir,'04_qc','qc_report.html'),
         
         #talon
         join(out_dir,'05_talon', 'talon_config.csv'),
-        join(out_dir,'05_talon', build_id + '.db'),
-        expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
+        # join(out_dir,'05_talon', build_id + '.db'),
+        # expand(join(out_dir,'05_talon','sam_labeled','{bc}_labeled.sam'),bc=bc_list),
         join(out_dir,'05_talon','annotate', build_id + '_talon_read_annot.tsv'),
         join(out_dir,'05_talon','counts', build_id + '_talon_summary.tsv'),
         join(out_dir,'05_talon','counts', build_id + '_talon_abundance.tsv'),
@@ -235,10 +235,10 @@ rule all:
         expand(join(out_dir,'05_talon','transcript_filtered','{bc}_category_list.txt'),bc=bc_list),
         
         #flair
-        join(out_dir,'06_flair','merged.fastq.gz'),
-        join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa'),
+        # join(out_dir,'06_flair','merged.fastq.gz'),
+        # join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa'),
         join(out_dir,'06_flair','flair_config.csv'),
-        expand(join(out_dir,'06_flair','fastq','{bc}.fastq'),bc=bc_list),
+        # expand(join(out_dir,'06_flair','fastq','{bc}.fastq'),bc=bc_list),
         join(out_dir,'06_flair','counts','flair_counts_matrix.tsv'),
         expand(join(out_dir,'07_deg','deg_iso_{group_id}.txt'),group_id=deg_list),
 
