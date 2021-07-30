@@ -232,8 +232,8 @@ rule all:
         join(out_dir,'05_talon','counts', build_id + '_whitelist.txt'),
         join(out_dir,'05_talon','counts', build_id + '_talon_abundance_filtered.tsv'),
         join(out_dir,'05_talon','gtf', build_id + '_talon.gtf'),
-        expand(join(out_dir,'05_talon','transcript_filtered','{bc}_Known.bam'),bc=bc_list),
-
+        expand(join(out_dir,'05_talon','transcript_filtered','{bc}_category_list.txt'),bc=bc_list),
+        
         #flair
         join(out_dir,'06_flair','merged.fastq.gz'),
         join(out_dir,'06_flair','isoforms','merged_flair.isoforms.fa'),
@@ -803,10 +803,10 @@ if (masked_refs == "Y"):
             config['java'],
             config['picard'],
             config['samtools'],
+            config['bedtools']
         output:
             bam = temp(join(out_dir,'05_talon','transcript_filtered','{bc}_labeled.bam')),
             cat_list = temp(join(out_dir,'05_talon','transcript_filtered','{bc}_category_list.txt')),
-            filt = join(out_dir,'05_talon','transcript_filtered','{bc}_Known.bam'),
         shell:
             """
             #determine which transcript categories are present in samples, skip header
@@ -815,7 +815,7 @@ if (masked_refs == "Y"):
             #create bam
             samtools view -bS {input.sam}> {output.bam};
 
-            #create read list, create subset bam file
+            #create read list, create subset bam file, sam file 
             while read p; do \
                 cat {input.anno} | awk -v p="$p" '$17 == '"p"'' | cut -f1 > {params.base}${{p}}_readlist.txt;
 
@@ -823,8 +823,13 @@ if (masked_refs == "Y"):
                     I={output.bam} \
                     O={params.base}${{p}}.bam \
                     READ_LIST_FILE={params.base}${{p}}_readlist.txt \
-                    FILTER=includeReadList
-            done <{output.cat_list};            
+                    FILTER=includeReadList;
+
+                samtools view -h -o {params.base}${{p}}.sam {params.base}${{p}}.bam;
+
+                bedtools bamtofastq -i {params.base}${{p}}.bam -fq {params.base}${{p}}.fastq;
+            done <{output.cat_list};
+  
             """
 
 rule merge_fq:
